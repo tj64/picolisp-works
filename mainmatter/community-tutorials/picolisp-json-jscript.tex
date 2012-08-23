@@ -1,0 +1,233 @@
+\title{PicoLisp to JSON with JavaScript}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+\begin{abstract}
+  This article describes how to convert PicoLisp to JSON on the client
+  side instead of on the server, using JavaScript.  
+\end{abstract}
+
+\section{REGEXP problems}
+\label{sec:pl-json-jscript-regexp-problems}
+
+On many occasions it's preferable to convert PicoLisp on the client side
+instead of on the server, here's an attempt.
+
+However, there are two problems with the below approach:
+
+\begin{enumerate}
+\item The first huge regexp that checks for a paired list will break
+  if any key or value has an escaped quote in it. I've scoured the
+  Internet until my eyes bled but I couldn't find an example of
+  JavaScript regex that would handle backslashes. I also found out
+  that the JS regexp capabilities are not 100\% on par with for
+  instance PERL's, it might be what what I want is impossible to
+  achieve with regexes alone.
+\item The second regexp that checks for a single pair/obj will not
+  work if the key has an escaped quote in it, this is however a less
+  serious problem than 1) as it's extremely unlikely to happen.
+\end{enumerate}
+
+\textbf{Update}: I've gotten some help from Mateusz Jan Przybylski on the
+\href{http://www.mail-archive.com/picolisp@software-lab.de/msg01050.html}{PicoLisp mailing list}. It seems we can handle quotes in the values of objects
+now. I still couldn't get it to work though with the standalone, single
+pair/object so \#2 above still holds.
+
+\textbf{Update 2:}: After some discussion on the mailing list again
+we've agreed to handle \texttt{(”:key” (1 2 3))} as \texttt{\{”key”:
+  [1, 2, 3]\}}. This current version is more flexible than what you've
+seen here before, it will now handle nested associative lists. It is
+however not very robust, I can think of a lot of strange edge
+scenarios that will make it break. Anyway, it's good enough for me and
+my current usage scenarios.
+
+\section{JavaScript Code}
+\label{sec:pl-json-jscript-javascript-code}
+
+\begin{wideverbatim}
+function countSubsChrs(str, start_chr, pos, dir){
+    var cur_chr = start_chr;
+    var count   = 0;
+    while(cur_chr == start_chr){
+      cur_chr   = str.charAt(pos);
+      pos       += dir;
+      count     += 1;
+    }
+    return count;
+}
+
+function isEscaped(str, pos){
+    var result = countSubsChrs(str, '\\', pos, -1) % 2;
+    return result == 0 ? false : true;
+}
+
+function getListEnd(str, cur_pos, dir){
+    var lvl = 1;
+    var pos = cur_pos + dir;
+    var dq  = 0;
+    while(lvl != 0 && pos != str.length){
+        var chr = str.charAt(pos);
+        switch(chr){
+            case '"':
+                if(!isEscaped(str, pos)) dq += 1;
+                break;
+            case '(':
+                if(dq % 2 == 0) lvl += dir;
+                break;
+            case ')':
+                if(dq % 2 == 0) lvl -= dir;
+                break;
+            default: break;
+        }
+
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+        if(pos < 1) break;
+        pos += dir;
+    } 
+    return pos; 
+}
+
+function isPaired(str){
+    var is_p = true;
+    if(str.match(/^\(.+\)$/)){  
+        for(var i = 0; i < str.length; i++){
+            if(str.charAt(i) == '('){
+                var rest = str.slice(i+1);
+                if(!rest.match(/^"\:[^"]*"\s\(/) && 
+                   !rest.match(/^("[^"]*"|\d+)\s\.\s[^\s]/)){
+                    is_p = false;
+                    break;
+                }
+                i = getListEnd(str, i, 1) - 1;
+            }
+        }
+    }else
+        is_p = false;
+    return is_p;
+}
+
+function hasKey(str, pos){
+    var back_str = str.slice(getListEnd(str, pos, -1) + 2, pos);
+    return back_str.match(/^("\:[^"]*")\s/);
+}
+
+function picoToJson(str){
+    str = str.slice(1, -1);
+    
+    if(isPaired(str))
+        var mode = 'pairs';
+    else if(str.match(/^"\:[^"]*"\s/))
+        var mode ='obj';
+    else
+        var mode = str.match(/^("[^"]*"|\d+)\s\.\s[^\s]/) ? 'obj' : 'arr';
+    
+    var rstr = mode == 'arr' ? "[" : "{";
+    var is_str = false;
+    var chr = "";
+
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+
+    for(var i = 0; i < str.length; i++){
+        chr = str.charAt(i);
+        if(is_str){
+            if(str.charAt(i) == ':' && (str.charAt(i-2) == 
+            '(' || str.charAt(i-1) == '"') && (mode == 'obj' || mode == 'pairs'))
+                rstr += '';
+            else
+                rstr += chr;
+            if(chr == '"' && str.charAt(i - 1) != '\\')
+                is_str = false;    
+        }else{
+            switch(chr){
+                case '(':
+                    if(mode != 'pairs'){
+                        var end_pos = getListEnd(str, i, 1);
+                        rstr += picoToJson( str.slice(i, end_pos));
+                        i = end_pos - 1;
+                    }else{
+                        if(i != 0 && str.charAt(i-2) != ')'){
+                            if(hasKey(str, i)){
+                                var end_pos = getListEnd(str, i, 1);
+                                rstr += picoToJson( str.slice(i, end_pos) );
+                                i = end_pos - 1;
+                            }
+                        }
+                    }   
+                    break;
+                case 'N':
+                    if(str.charAt(i+1) == 'I' && str.charAt(i+2) == 'L'){
+                        rstr += 'false';
+                        i += 2;
+                    }
+                    break;
+                case 'T':
+                        rstr += 'true';
+                    break;
+                case ')':
+                    if(i < str.length - 1)
+                        rstr += ',';
+                    break;
+                case '"':
+                    if(str.charAt(i - 1) != '\\')
+                        is_str = true;
+                    rstr += chr;
+                    break;
+
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+
+                case ' ':
+                    if(str.charAt(i + 1) == '(' && (mode == 'obj' || mode == 'pairs')){
+                        if(mode == 'obj')
+                            rstr += ": ";
+                        else if(mode == 'pairs' && str.charAt(i-1) != ')')
+                            rstr += ": ";
+                        else
+                            rstr += " ";
+                    }else if(str.charAt(i + 1) == '.' &&
+                            (mode == 'obj' || mode == 'pairs')){
+                        rstr += ":";
+                        i++;
+                    }else if(mode == 'arr')
+                        rstr += ', ';
+                    else
+                        rstr += chr;
+                    break;
+                default:
+                    rstr += chr;
+                    break;
+            }
+        }
+    }
+    rstr += mode == 'arr' ? "]" : "}";
+    return rstr;
+}
+
+function evalPico(str){
+    return eval('('+picoToJson(str.replace(/\n/gm, ''))+')');
+}
+
+var str = '("first element" ("obj" . "yes") 2 
+           (":links" (1 2 3)) ((1 . 2) (":links" (4 5 6))) "final element")';
+var json = picoToJson(str);
+alert(json);
+var result = eval('('+json+')');
+alert(result[3].links.pop());
+\end{wideverbatim}
+
+A lot of the code above has been converted from the Ruby
+\href{http://www.prodevtips.com/2008/05/06/scintilla-basics-in-wxruby/}{Pico
+  Editor} code.
+
+

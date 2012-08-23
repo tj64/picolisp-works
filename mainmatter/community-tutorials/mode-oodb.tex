@@ -1,0 +1,318 @@
+\title*{More OODB in PicoLisp}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+\section{More OODB in Pico Lisp}
+\label{sec:more-oodb}
+
+This time we will examine some more complex relationships with a common
+scenario, the CMS.
+
+Without deleting the file (users.db, yes the name is no longer
+representative but we don't care) created in the prior article do the
+following:
+
+
+\begin{wideverbatim}
+(class +User +Entity)
+(rel username (+Need +Key +String))
+(rel password (+Need +String))
+
+(class +Article +Entity)
+(rel slug     (+Need +Key +String))
+(rel headline (+Need +Idx +String))
+(rel body     (+Need +String))
+(rel author   (+Link)(+User))
+
+(pool "users.db")
+
+(obj ((+Article) slug "valves-new-strategy") 
+     headline "Valve's new strategy" 
+     body "An article about a computer game company." 
+     author `(db 'username '+User "sam"))
+
+(obj ((+Article) slug "diving-palau") 
+     headline "Diving Palau" 
+     body "An article about the diving in Palau." 
+     author `(db 'username '+User "fred"))
+
+(obj ((+Article) slug "the-coolest-gadgets-in-2008") 
+     headline "The coolest gadgets in 2008" 
+     body "An article about all the new gadgets unleashed in 2008." 
+     author `(db 'username '+User "fred"))
+
+(commit)
+
+(mapcar show (collect 'slug '+Article))
+\end{wideverbatim}
+
+Obviously we are fetching objects from the database with our \textbf{db} calls
+above, the \textbf{`} read macro will evaluate its list and return the result,
+in this case the objects \{5\} and \{2\} (Fred and Sam). \textbf{commit} will save
+our newly created objects to the database file.
+
+The new thing here is +Link which will function as a reference to an
+object, in our case a user, the author of the article.
+
+Output:
+
+
+\begin{wideverbatim}
+{;} (+Article)
+   author {5}
+   body "An article about the diving in Palau."
+   headline "Diving Palau"
+   slug "diving-palau"
+{C} (+Article)
+   author {5}
+   body "An article about all the new gadgets unleashed in 2008."
+   headline "The coolest gadgets in 2008"
+   slug "the-coolest-gadgets-in-2008"
+{7} (+Article)
+   author {2}
+   body "An article about a computer game company."
+   headline "Valve's new strategy"
+   slug "valves-new-strategy"
+-> ({;} {C} {7})
+\end{wideverbatim}
+
+This setup will make it easy for an article to retrieve its author, a
+common operation in a CMS. Remove the object creation part and replace
+the mapcar in the above listing with:
+
+
+\begin{wideverbatim}
+(setq *CurArticle (db 'slug '+Article "diving-palau"))
+(show (get *CurArticle 'author))
+\end{wideverbatim}
+
+And we get Fred. However in order for Fred to be able to fetch all
+articles written by him we need to change the model (you can delete
+user.db now):
+
+
+\begin{wideverbatim}
+(class +User +Entity)
+(rel username (+Need +Key +String))
+(rel password (+Need +String))
+
+(class +Article +Entity)
+(rel slug     (+Need +Key +String))
+(rel headline (+Need +Idx +String))
+(rel body     (+Need +String))
+(rel author   (+Ref +Link) NIL (+User))
+
+(pool "cms.db")
+
+#The new! lines here (new! '(+User) 'username "sam" 'password "parrotno5")...
+
+#The obj lines here (obj ((+Article) slug "valves-new-strategy")...
+
+(commit)
+
+(setq *CurUser (db 'username '+User "fred"))
+(mapcar show (collect 'author '+Article *CurUser))
+\end{wideverbatim}
+
+Don't forget to paste the lines I left out! So the only difference here
+is: (rel author (+Ref +Link) NIL (+User)) where +Ref is responsible for
+our new ability to fetch articles per user through a new global index.
+Without +Ref we just had a reference to a single authour inside each
+article. The above collect statement would not have worked with that
+setup.
+
+Let's go for a folder based structure a la MODx and TYPO3 by running
+this (without deleting cms.db):
+
+
+\begin{wideverbatim}
+(class +User +Entity)
+(rel username (+Need +Key +String))
+(rel password (+Need +String))
+
+(class +Article +Entity)
+(rel slug     (+Need +Key +String))
+(rel headline (+Need +Idx +String))
+(rel body     (+Need +String))
+(rel author   (+Ref +Link) NIL (+User))
+(rel folder   (+Ref +Link) NIL (+Article))
+
+(pool "cms.db")
+
+(new! '(+Article) 'slug "tech" 'headline "Technology" 'body "The tech area." 'author (db 'username '+User "sam"))
+
+(mapc '((Slug)
+         (let Folder (db 'slug '+Article "tech")
+           (put> (db 'slug '+Article Slug) 'folder Folder)))
+       '("the-coolest-gadgets-in-2008" "valves-new-strategy"))
+
+(commit)
+
+(mapcar show (collect 'slug '+Article))
+\end{wideverbatim}
+
+Notice the use of \textbf{put>}, just using \textbf{put} would not give us the global
+reference index, only the single reference as would have been the case
+if we weren't using +Ref. Running
+
+
+\begin{wideverbatim}
+(mapcar show (collect 'folder '+Article (db 'slug '+Article "tech")))
+\end{wideverbatim}
+
+would have resulted in NIL if you had used only \textbf{put}. However running
+
+
+\begin{wideverbatim}
+(show (get (db 'slug '+Article "the-coolest-gadgets-in-2008") 'folder))
+\end{wideverbatim}
+
+would still have showed the tech article. Let's implement tags:
+
+
+\begin{wideverbatim}
+(class +User +Entity)
+(rel username (+Need +Key +String))
+(rel password (+Need +String))
+
+(class +Article +Entity)
+(rel slug     (+Need +Key +String))
+(rel headline (+Need +Idx +String))
+(rel body     (+Need +String))
+(rel author   (+Ref +Link) NIL (+User))
+(rel folder   (+Ref +Link) NIL (+Article))
+(rel tags     (+List +Ref +Link) NIL (+Tag))
+
+(class +Tag +Entity)
+(rel tag (+Need +Key +String))
+
+(pool "cms.db")
+
+(new! '(+Tag) 'tag "scuba")
+(new! '(+Tag) 'tag "gadgets")
+(new! '(+Tag) 'tag "gaming")
+(new! '(+Tag) 'tag "sports")
+(new! '(+Tag) 'tag "pc")
+(new! '(+Tag) 'tag "iphone")
+(new! '(+Tag) 'tag "fun")
+
+(setq *Relations '(("valves-new-strategy" "pc" "fun" "gaming")
+                   ("diving-palau" "fun" "scuba" "sports")
+                   ("the-coolest-gadgets-in-2008" "gadgets" "fun" "iphone")
+                   ("tech" "gadgets" "fun" "iphone" "pc" "gaming")))
+
+(mapc
+ '((Rel)
+   (let Article (db 'slug '+Article (car Rel))
+     (mapc 
+      '((Tag)
+        (put> Article 'tags (db 'tag '+Tag Tag))) 
+      (cdr Rel)))) 
+ *Relations)
+
+(commit)
+
+(mapcar show (get (db 'slug '+Article "tech") 'tags))
+\end{wideverbatim}
+
+The new thing here is (rel tags (+List +Ref +Link) NIL (+Tag)) which
+will create the references, the +List prefix is responsible for handling
+the fact that we now have many tags belonging to the same article. The
+last line above will show all tags that apply to the article with the
+slug ``tech''.
+
+
+\begin{wideverbatim}
+(scan (tree 'tags '+Article))
+\end{wideverbatim}
+
+Gives me:
+
+
+\begin{wideverbatim}
+({H} . {A}) {A}
+({K} . {D}) {D}
+({K} . {F}) {F}
+({L} . {7}) {7}
+({L} . {F}) {F}
+({M} . {A}) {A}
+({N} . {7}) {7}
+({N} . {F}) {F}
+({O} . {D}) {D}
+({O} . {F}) {F}
+({P} . {7}) {7}
+({P} . {A}) {A}
+({P} . {D}) {D}
+({P} . {F}) {F}
+-> {R}
+\end{wideverbatim}
+
+And
+
+
+\begin{wideverbatim}
+(mapcar show (collect 'slug '+Article))
+\end{wideverbatim}
+
+results in:
+
+
+\begin{wideverbatim}
+{A} (+Article)
+   tags ({M} {H} {P})
+   author {5}
+   body "An article about the diving in Palau."
+   headline "Diving Palau"
+   slug "diving-palau"
+{F} (+Article)
+   tags ({L} {N} {O} {P} {K})
+   author {2}
+   body "The tech area."
+   headline "Technology"
+   slug "tech"
+{D} (+Article)
+   tags ({O} {P} {K})
+   folder {F}
+   author {5}
+   body "An article about all the new gadgets unleashed in 2008."
+   headline "The coolest gadgets in 2008"
+   slug "the-coolest-gadgets-in-2008"
+{7} (+Article)
+   tags ({L} {P} {N})
+   folder {F}
+   author {2}
+   body "An article about a computer game company."
+   headline "Valve's new strategy"
+   slug "valves-new-strategy"
+-> ({A} {F} {D} {7})
+\end{wideverbatim}
+
+As you can see in the above scan of the index tree we have the tag in
+the car of the key and the article in the cdr. This will enable us to
+get all the articles belonging to a specific tag:
+
+
+\begin{wideverbatim}
+(setq *CurTag (fetch (tree 'tag '+Tag) "pc"))
+
+(mapcar show 
+        (make 
+         (scan 
+          (tree 'tags '+Article) 
+          '((Key Value)
+            (when (= *CurTag (car Key)) (link Value))))))
+\end{wideverbatim}
+
+That conlcudes this piece and we still havent touched
+\href{http://www.software-lab.de/ref.html#pilog}{Pilog}. Feel free to go
+ahead and study the doc/family.l example and the
+\href{http://www.software-lab.de/tut.html#pilog}{Pilog Tutorial}.
+
+This entry was posted on Thursday, April 24th, 2008 at 6:55 am 
+
+
+
+% Local variables:
+% mode: latex
+% TeX-master: "../../editor.tex"
+% End:

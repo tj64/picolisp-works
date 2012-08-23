@@ -1,0 +1,342 @@
+\title{PicoLisp and JSON}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+
+\begin{abstract}
+This article discusses libraries and tests for converting PicoLisp to
+JSON and vice versa.   
+\end{abstract}
+
+\section{Introduction}
+\label{sec:pl-json-introduction}
+
+Yet again I have to do some documenting so I know what the hell I'm
+doing since I'm all over the place at the moment. Doing something here
+and then moving over to do something over there and then coming back to
+coding this and that. If you're this unstructured you need crutches and
+this documentation is that, it will enable me to get back to this and do
+easy debugging in the future, it will trigger memories.
+
+Therefore this code is very rough and untested, a work in progress, you
+have been warned\dots{}
+
+If you somehow landed on this page without any background on PicoLisp
+or Lisp you probably need to start
+\href{http://www.prodevtips.com/2008/03/28/pico-lisp/}{from the beginning}.
+
+\section{The tests}
+\label{sec:pl-json-the-tests}
+
+\subsection{PicoLisp to JSON}
+\label{sec:pl-json-picolisp-to-json}
+
+Let's start with the tests for a change. This is an example of
+converting a proper database object to JSON. The code will determine the
+relations and use them to build the JSON, nothing else that might be in
+there:
+
+
+\begin{wideverbatim}
+(load "lib/str.l")
+(load "lib/json.l")
+
+(class +Product +Entity)
+(rel name (+Need +String))
+(rel id (+Need +Number))
+(rel descr (+String))
+(rel attributes (+List +String))
+
+(setq Product
+   (new '(+Product) 'name
+      "A \"PC\"" 'id 123 'attributes '("black" "laptop") ) )
+
+(println (to> '+Json 'encObj> Product))
+\end{wideverbatim}
+
+Output:
+
+\begin{wideverbatim}
+  "{\"attributes\": [\"black\", \"laptop\"], \"id\": 123,
+    \"name\": \"A \\\"PC\\\"\", \"descr\": false}"
+\end{wideverbatim}
+
+\textbf{Associative structure}, it will also be encoded as object:
+
+\begin{wideverbatim}
+(setq Pairs '((key1 . hello) (key2 . world) (false . NIL)
+              (someArr . (1 2 "hello quote: \"quote\"" 4)) ) )
+(println (to> '+Json 'encPair> Pairs))
+\end{wideverbatim}
+
+
+\begin{wideverbatim}
+  "{\"key1\": \"hello\", \"key2\": \"world\", \"false\": false,
+    \"someArr\": [1, 2, \"hello quote: \\\"quote\\\"\", 4]}"
+\end{wideverbatim}
+
+\textbf{2D structure} will be an array of objects:
+
+\begin{wideverbatim}
+(setq Pair1 '((key1 . hello) (key2 . world) (false . NIL) (someArr . (1 2 "hello" 4))))
+(setq Pair2 '((key1 . hello) (key2 . world) (false . NIL) (someArr . (1 2 "world" 4))))
+(setq Tst (list Pair1 Pair2))
+(println (to> '+Json 'encTable> Tst))
+\end{wideverbatim}
+
+
+\begin{wideverbatim}
+  "[{\"key1\": \"hello\", \"key2\": \"world\", \"false\": false,
+    \"someArr\": [1, 2, \"hello\", 4]}, 
+  {\"key1\": \"hello\", \"key2\": \"world\", \"false\": false,
+    \"someArr\": [1, 2, \"world\", 4]}]"
+\end{wideverbatim}
+
+Simple case of \textbf{nested list}:
+
+\begin{wideverbatim}
+(setq Tst (list 1 2 "hello" (1 2 3) 3 4 "world"))
+(println (to> '+Json 'encArr> Tst))
+\end{wideverbatim}
+
+
+\begin{wideverbatim}
+"[1, 2, \"hello\", [1, 2, 3], 3, 4, \"world\"]"
+\end{wideverbatim}
+
+\subsection{JSON to PicoLisp}
+\label{sec:pl-json-json-to-picolisp}
+
+\begin{wideverbatim}
+(setq Json "{\"hello1\": {\"subObj\": [123, 456, true, NIL]}, \"b\": true}")
+(setq Result (from> '+Json Json))
+(show Result)
+(show (get Result 'hello1))
+\end{wideverbatim}
+
+
+\begin{wideverbatim}
+$385543015 NIL
+   b
+   hello1 $385543062
+$385543062 NIL
+   subObj (123 456 T NIL)
+\end{wideverbatim}
+
+\section{The library}
+\label{sec:pl-json-the-library}
+
+
+\subsection{JSON to PicoLisp}
+\label{sec:pl-json-json-to-picolisp}
+
+
+
+\begin{wideverbatim}
+(class +Json)
+
+(dm from> (J)
+  (=: L (chop J))
+  (let C (pop (:: L))
+     (let R (if (= C "[") (pre> This 'pArr>) (pre> This 'pObj>))        
+        (parse> This R))))
+\end{wideverbatim}
+
+This is where the coding from JSON to PicoLisp structure begins.
+
+
+\begin{wideverbatim}
+(dm pre> (Type)
+  (let (R (list Type) InStr NIL)
+     (catch NIL 
+        (while (: L)
+           (let C (pop (:: L))
+              (cond
+                 ((= C "[") (queue 'R (pre> This 'pArr>)))
+                 ((= C "{") (queue 'R (pre> This 'pObj>)))
+                 ((and (or (= C "]") (= C "}")) (nT InStr)) (throw))
+                 (T (when (= C "\"") 
+                          (setq InStr (not InStr))) 
+                       (queue 'R C)))))) R ))
+\end{wideverbatim}
+
+Here we are creating an intermediary list that will be easy to
+execute. We do this by inserting the names of functions to use in
+later steps into this list. But what is really happening? Well as you
+saw from the prior listing we begin with either
+\textbf{pArr\textgreater{}} or \textbf{pObj\textgreater{}} depending
+on if we are to begin parsing to an object or an array. \textbf{InStr}
+will keep track of whether the characters \textbf{\{, \}, [, ]} are
+inside a string or not, if they are they should not count of course.
+
+So while we still have characters in our chopped up list we will loop
+through them by destructively popping, if we have a ``[`` we will put
+\textbf{pArr\textgreater{}} on the list instead of the caracter, if we
+have ``\{'' we put \textbf{pObj\textgreater{}}. If we have the
+respective closing character, and it is not inside a string, we exit
+by throwing \texttt{NIL}.
+
+
+\begin{wideverbatim}
+(dm any> (L)
+   (let R (any (pack L))      
+      (if (= R "true") T (if (= R "false") NIL R))))
+
+(dm parse> (L)  
+  (apply (car L) (list This (cdr L))))
+    
+(dm pObj> (L)
+  (let (R (new) L (split L ",")) 
+     (for El L
+        (let Pair (split El ":")
+           (put R 
+              (any (any (pack (car Pair)))) 
+              (let Value (cdadr Pair)                 
+                 (if (lst? (car Value))
+                    (parse> This (car Value))
+                    (any> This Value)))))) R ))
+\end{wideverbatim}
+
+We begin by applying either \textbf{pObj\textgreater{}} or
+\textbf{pArr\textgreater{}} in \textbf{parse\textgreater{}}.
+
+The \texttt{pObj>} method will begin with creating the empty result
+object, \textbf{R} and a list of sublists looking something like this:
+(``k'' ``e'' ``y'' ``:'' ``v'' ``a'' ``l'' ``u'' ``e'') in \textbf{L} by
+splitting by ``,''.
+
+We continue by splitting by ``:'' to get the key and the value. The key is
+then retrieved, the value will be further examined to determine if we
+should apply recursion to get a sub-object/array or simply return the
+result through \textbf{any\textgreater{}}.
+
+\begin{wideverbatim}
+(dm pArr> (L)
+   (make       
+      (for El (mapcar 'clip (split L ","))         
+         (if (lst? (car El))
+            (link (parse> This (car El)))
+            (link (any> This El))))))
+\end{wideverbatim}
+
+
+\subsection{PicoLisp to JSON}
+\label{sec:pl-json-picolisp-to-json}
+
+
+\begin{wideverbatim}
+(dm to> (F L)
+   (pack (make (apply F (list This L)))))
+\end{wideverbatim}
+
+As you know from the tests above the behavior has to be explicitly set
+by passing the function name to be used to generate the result when
+going from PicoLisp to Javascript. It's pretty obvious actually since
+it's impossible to determine from the structure of various types of
+lists how to treat them. We can't infer whether a list is a normal
+nested list or a paired list, for all intents and purposes they are
+identical. However the output will be radically different. Note
+\textbf{make}, that is why we are able to use \textbf{link} all over
+the place below.
+
+
+\begin{wideverbatim}
+(dm encTable> (Tbl)
+  (link "[")
+  (let F T 
+     (mapc 
+        '((L) 
+            (link (comma> This F)) 
+            (encPair> This L) 
+            (setq F NIL)) Tbl))
+  (link "]"))
+
+(dm encPair> (L)    
+  (link "{")
+  (let F T 
+     (mapc 
+     '((El) 
+         (link (pack (comma> This F) "\"" (car El) "\"" ":" " "))
+         (setq F NIL)                  
+         (enc> This (if (pair El) (cdr El) NIL))) L ))
+  (link "}"))
+
+(dm comma> (First)
+   (unless First ", "))
+\end{wideverbatim}
+
+Some redundant code here, it might benefit from refactoring, or we
+could just leave it like it is and call it a day, yeah let's do that.
+When encoding a table each element will in turn be encoded with
+\textbf{encPair\textgreater{}}, if we have the first element we do not
+prepend the ``,''.
+
+A paired list will be encoded as an object with
+\textbf{encPair\textgreater{}}.
+
+
+\begin{wideverbatim}
+(dm encArr> (L)  
+  (link "[")
+  (let F T
+     (mapc 
+     '((El) 
+         (link (pack (comma> This F)))
+         (setq F NIL)
+         (enc> This El)) L ))
+  (link "]"))
+\end{wideverbatim}
+
+Redundancy again! \texttt{List -> array} is easier though than
+\texttt{paired list -> object}.
+
+
+\begin{wideverbatim}
+(dm encObj> (O)
+  (encPair> This 
+     (make 
+        (mapc 
+           '((Prop)
+               (when (isa '+Relation (car Prop)) 
+                  (let Key (cdr Prop) 
+                     (link (cons Key (get O Key)))))) (getl (car (type O)))))))
+\end{wideverbatim}
+
+Finally something clever, in case of object we will get all the
+properties of the object through the \texttt{getl} function. Every
+property that is a relation will get the ``treatment''. We get the
+name of the relation as \textbf{Key} and use that name on the original
+object to retrieve the value. The resultant array is now a paired list
+that can be encoded with \textbf{encObj\textgreater{}}.
+
+
+\begin{wideverbatim}
+(dm enc> (L)   
+   (cond 
+      ((=T L)    (link "true"))
+      ((not L)   (link "false"))
+
+      ((num? L)  (link L))
+      ((lst? L)  (encArr> This L))
+      ((or (box? L) (ext? L)) (encObj> This L))))
+\end{wideverbatim}
+
+accordingly, notice the escaping with \textbf{+Str}. It's the genesis of some
+kind of general string library, not much in there yet though:
+
+\begin{wideverbatim}
+
+(dm fChr> (Lst Chr)
+  (find '((C)(= C Chr)) Lst))
+   
+#S = hello, Lst = '("\"")
+(dm esc> (S Lst)
+  (pack 
+     (mapcar 
+        '((C)
+            (if (fChr> This Lst C) (pack "\\" C) C )) (chop S))))
+\end{wideverbatim}
+
+Every character in the passed list (in this case only one) will be
+escaped.
+

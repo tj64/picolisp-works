@@ -1,0 +1,219 @@
+\title{Prolog as a Dating Aid}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+
+\begin{abstract}
+  This article describes how \texttt{Pilog}, PicoLisp's implementation
+  of \texttt{Prolog}, can be used to find out which women in a
+  flirt\&dating database have similar tastes like the male
+  candidate. 
+\end{abstract}
+
+\section{A \texttt{Prolog} presentation}
+\label{sec:prolog-dat-aid-a-prolog-presentation}
+
+This Saturday I had a small presentation. It wasn't really well prepared
+so I'll try and make up for it here instead.
+
+I wanted to demonstrate how Prolog, or in my case Pilog (same thing but
+different syntax), could be used to solve problems and query object
+databases. If you've been following my stuff on PicoLisp you won't find
+much new.
+
+\section{Set up a Prolog environment}
+\label{sec:prolog-dat-aid-set-up-a-prolog-environment}
+
+First I began by setting up a simple Prolog environment to demonstrate
+how Pilog can be used in a setting free of object databases. The goal is
+to find a compatible woman. This is basically the same thing as the
+\href{http://www.prodevtips.com/2008/04/28/advanced-oodb-in-pico-lisp/}{food example}.
+
+
+\begin{wideverbatim}
+(be actionMovies (Jane))
+(be actionMovies (Yoko))
+(be durian (Kwan))
+(be somTum (Kwan))
+(be diving (Anna))
+(be Japanese (Yoko))
+(be blond (Anna))
+(be petite (Yoko))
+(be petite (Kwan))
+(be sporty (Anna))
+(be funny (Yoko))
+(be likeBeer (Jane))
+(be likeBeer (Anna))
+(be speaksThai (Kwan))
+
+(be likes (Tum @F) (actionMovies @F))
+(be likes (Tum @F) (Japanese @F))
+(be likes (Tum @F) (blond @F))
+(be likes (Tum @F) (petite @F))
+(be likes (Tum @F) (funny @F))
+(be likes (Tum @F) (sporty @F))
+(be likes (Tum @F) (likeBeer @F))
+(be likes (Tum @F) (speaksThai @F))
+(be likes (Tum @F) (durian @F))
+(be likes (Tum @F) (somTum @F))
+(be likes (Tum @F) (diving @F))
+
+(let L NIL
+        (solve '((likes Tum @F))
+           (accu 'L @F 1) )
+        (flip (by cdr sort L)) )
+
+(println L)
+\end{wideverbatim}
+
+The last sequence will output the woman Tum likes the most first and
+then in descending order. Try to fool around with it, starting with
+\texttt{(? (likes Tum @F))} and then adding the rest step by step and
+see how the output changes for each step.
+
+\section{The database}
+\label{sec:prolog-dat-aid-the-database}
+
+
+\subsection{Generate the database}
+\label{sec:prolog-dat-aid-generate-the-database}
+
+Let's move on to the database stuff. First we need to generate it, you
+can do that by running the following:
+
+
+\begin{wideverbatim}
+(class +Woman +Entity)
+(rel id       (+Key +Number))
+(rel age      (+Number))
+(rel country  (+Ref +Link) NIL (+Country))
+(rel hair     (+Ref +Link) NIL (+Color))
+(rel smoking  (+Number))
+(rel tattoo   (+Number))
+
+(class +Country +Entity)
+(rel name (+Key +String))
+
+(class +Color +Entity)
+(rel color (+Key +String))
+
+(class +Likes +Entity)
+(rel name  (+Key +String))
+
+(class +LikesCon +Entity)
+(rel woman  (+Aux +Ref +Link) (likes) NIL (+Woman))
+(rel likes  (+Ref +Link) NIL (+Likes))
+ 
+(pool "bcamp_phuket.db")
+
+(de randEls (Cls Key Amount)
+   (make 
+      (let Lst (collect Key Cls)         
+         (do Amount
+            (let Nth (rand 1 (length Lst))               
+               (link (get Lst Nth)))))))
+    
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+(de setup()
+   (mapc '((Col) (new!  '(+Color)   'color Col))
+      '("red" "brown" "blond" "black") )
+   (mapc '((Like)(new!  '(+Likes)   'name Like))
+      '("diving" "skiing" "partying" "pop" "rock" "alternative" "cars"
+          "beer" "tennis" "wine" "golf" "geeks" "computers" "som tam"
+          "gaeng som" "larb moo" "gaeng aum" ) )
+   (mapc '((Con) (new!  '(+Country) 'name Con))
+      '("Sweden" "Thailand" "Japan") ) )
+
+(de createWomen ()
+   (let N 0 
+      (do 10000
+         (new! '(+Woman) 
+            'age (rand 18 65)
+            'country (car (randEls '+Country 'name 1))
+            'hair (car (randEls '+Color 'color 1))
+            'smoking (rand 0 1)
+            'tattoo (rand 0 1)
+            'id (inc 'N)))))
+    
+(de createLikes ()
+   (for W (collect 'id '+Woman)
+      (for L (randEls '+Likes 'name 10)
+         (new! '(+LikesCon) 'woman W 'likes L))))
+    
+(setup)
+(createWomen)
+(createLikes)
+\end{wideverbatim}
+
+This example uses \textbf{new!}, it takes quite a while to generate
+the database like this. You could try \textbf{new} followed by a
+\textbf{commit} when all the objects have been created if you want
+this to go faster.
+
+
+\subsection{Query the database}
+\label{sec:prolog-dat-aid-query-the-database}
+
+Let's move on to the final piece, you run this after the above code,
+don't forget to delete the three last function calls or comment them out
+first. The end could look like this:
+
+
+\begin{wideverbatim}
+#(setup)
+#(createWomen)
+#(createLikes)
+
+(setq Start (usec))
+(setq Women
+   (uniq 
+      (mapcar '((Con)(; Con woman)) 
+         (solve   
+            (quote
+               @C1 "Japan"
+               @C2 "Thailand"
+               @L1 "beer"         
+               @L2 "diving"         
+               @L3 "geeks"         
+               @Tat 1
+               @Smo 0
+               (select (@Links)  
+                  (((name +Likes @L1 name +Likes @L2 name +Likes @L3) (likes +LikesCon)))
+                  (or
+                     ((same @C1 @Links woman country name))
+                     ((same @C2 @Links woman country name)))
+                  (same @Tat @Links woman tattoo)
+                  (same @Smo @Links woman smoking)))   
+            @Links ))))
+    
+(setq End (format (/ (- (usec) Start) 100000) 1))
+
+(mapc 
+   '((W)
+       (println 
+          (; W country name)           
+          (; W smoking)          
+          (; W tattoo)          
+          (collect 'woman '+LikesCon W W 'likes 'name))) Women)
+    
+(println 
+   (pack 
+      "There were " 
+      (length Women) 
+      " women matching the query out of 10000. The query took " 
+      End 
+      " seconds."))
+\end{wideverbatim}
+
+The above will fetch all women from Thailand and Japan who like one of
+beer, diving or geeks, she also needs to sport a tattoo and not smoke.
+We work through the connection of women to what they like, when we
+have them we proceed by extracting the women with \texttt{‘((Con)(;
+  Con woman))} and cutting out duplicates with \textbf{uniq}.
+
+We proceed by printing each woman's relevant info and finally we print
+some statistics on how many hits we got and how long the fetch took.
+

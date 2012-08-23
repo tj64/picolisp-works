@@ -4,7 +4,7 @@ picolisp-works
 The source-code of the free book **PicoLisp Works**
 
 *PicoLisp Works* is a compilation of (almost) all available information
-about the technological gem PicoLisp - a programming language and
+about the technological gem **PicoLisp** - a programming language and
 environment that definitely deserves wider attention.
 
 Built on the unique characteristics of *Lisp* (almost no syntax, code is
@@ -19,11 +19,11 @@ PicoLisp may well represent the future too - as a candidate for being
 the *hundred-year language*, that all programming languages finally
 converge into. 
 
-**PicoLisp Works** is accompanied by a second volume, **PicoLisp by
+*PicoLisp Works* is accompanied by a second volume, **PicoLisp by
 Example**, (https://github.com/tj64/picolisp-by-example) with more than
 600 PicoLisp solutions to a wide range of programming tasks as well as
 the full PicoLisp function reference. Both volumes are freely
-available as pdf files, e.g. on [Scribd] (http://scribd.com).
+available as *pdf* files, e.g. on [Scribd] (http://scribd.com).
 
 This book is published under the *GNU Free Documentation Licence*.
 

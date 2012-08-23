@@ -1,0 +1,235 @@
+\title{Array Abstinence}
+\input{mainmatter/authors/alex}
+\maketitle
+
+% 16jul12
+% Alexander Burger
+
+% \documentclass[10pt,a4paper]{article}
+% \usepackage{graphicx}
+
+% \textwidth 1.4\textwidth
+% \textheight 1.125\textheight
+% \oddsidemargin 0em
+% \evensidemargin 0em
+% \headsep 0em
+% \parindent 0em
+% \parskip 6pt
+
+% \title{Array Abstinence}
+% \author{Alexander Burger\\abu@software-lab.de}
+% \date{2011-07-29}
+
+% \begin{document}
+% \maketitle
+
+\begin{abstract}
+  The differences between lists and arrays as well as the question if
+  arrays are really needed are discussed, followed by relative
+  performance considerations. 
+\end{abstract}
+
+\section{Introduction}
+\label{sec:array-abst-introduction}
+
+Some people are unhappy with the situation that PicoLisp has no
+built-in array (or vector) data type. As described in the reference
+manual, the \underline{PicoLisp
+  Machine}\footnote{http://software-lab.de/doc/ref.html\#vm} supports
+exactly \underline{three data
+  types}\footnote{http://software-lab.de/doc/ref.html\#data}: Numbers,
+Symbols and Lists.
+
+But what about arrays? After all, any other language supports arrays! We are so
+very much used to them.
+
+If we look at a typical Fortran, C or Java program, we find almost every second
+statement to be something like (e.g. in Java):
+\begin{wideverbatim}
+   for (i = 0; i < Arr.length; ++i)
+      doSomething(Arr[i]);
+\end{wideverbatim}
+
+It is nearly impossible to survive in such languages without arrays.
+
+\section{What is an Array?}
+\label{sec:array-abst-what-is-an-array?}
+
+An array is a wonderful data structure.
+
+It implements a mapping of numeric keys (integers) to arbitrary data. Given a
+number, the associated data can be found in O(1) time. And the keys themselves
+do not take up any memory space, they exist implicit in the data offsets form
+the array's start address.
+
+\section{Lists}
+\label{sec:array-abst-lists}
+
+PicoLisp has lists.
+
+A list can simulate an array, albeit less efficiently. It takes up twice the
+space, and indexed access to its data takes O(N/2) time on the average.
+
+But lists have a lot of advantages, and are also more efficient than arrays in
+many other cases. We do not need to discuss these advantages here in detail, any
+Lisp programmer will know them.
+
+As PicoLisp strives for simplicity, there is no room for an additional data type
+- also for hard physical reasons, as the number of precious tag bits is limited.
+To fully support an array data type, all those powerful built-in list
+manipulation functions would need array counterparts, and the programmer would
+permanently need to make design decisions whether to use lists or arrays for the
+problem at hand.
+
+If there is a choice between arrays \textbf{or} lists, lists will clearly win.
+
+\section{Are Arrays \textit{Really} Needed?}
+\label{sec:array-abst-are-arrays-really-needed}
+
+My short answer would be ``No''. The advantages in efficiency do not outweigh the
+disadvantages of increased complexity.
+
+I would even say that the proponents of arrays in PicoLisp misunderstand some
+aspects of PicoLisp programming.
+
+The predominance of arrays in other languages, as shown with the above example
+\begin{wideverbatim}
+   for (i = 0; i < Arr.length; ++i)
+      doSomething(Arr[i]);
+\end{wideverbatim}
+
+does not carry over to PicoLisp. Such constructs are simply not used. Instead,
+you have a large number of mapping functions at your disposal:
+\begin{wideverbatim}
+   (mapc doSomething Arr)
+\end{wideverbatim}
+
+In fact, it is the lack of functionality for the direct manipulation of compound
+data, which requires the excess indexing into arrays in other languages.
+
+The mistake is mixing up two separate concepts:
+\begin{enumerate}
+   \item Sequential access to certain pieces of data
+   \item Mapping integer keys to data items
+\end{enumerate}
+What arrays are \textit{really} needed for is point (2): You have an integer, and want
+to get the corresponding piece of data.
+
+Point (1), however, can and should be handled directly and elegantly with
+mapping and other access functions.
+
+So back to point (2). \textit{When} in our programming life do we really need to map
+integers to data?
+
+These cases are surprisingly rare. We have to keep in mind that for arrays only
+the mapping of continuous integer ranges makes sense. Most practical tasks of
+mapping numbers to other data involve sparse or non-linear input data, or
+non-integers, or no numeric keys at all.
+
+Sure, there are typical cases like image rasterization. But when did you the
+last time implement Bresenham's line algorithm in \textit{application} programming?
+Instead, you resort to a library, or write it in C or even assembly if a library
+is not available.
+
+In other cases - like two-dimensional maps - there are better ways. Look for
+example how the board in the PicoLisp chess program (and other games and many
+rosetta code solutions) is implemented with direct connection attributes (north,
+west etc.) between the fields instead of integer arithmetics for array indexes.
+
+For more flexible (not only integer, or even numeric) key mapping, built-in
+mechanisms like association lists, symbol properties or binary
+'\underline{idx}\footnote{http://software-lab.de/doc/refI.html\#idx}' trees can be used. Agreed,
+these mechanisms are less efficient than simple integer-indexed arrays, but the
+difference is not very dramatic.
+
+\section{Relative Performance Consideration}
+\label{sec:array-abst-relative-performance-consideration}
+
+What would be the performance penalty for using lists instead of arrays, if we
+would really need a mapping of a continuous integer range to other data?
+
+Let's assume an integer array of length 100, initialized to increasing values:
+\begin{wideverbatim}
+   int Arr[100];
+
+   for (i = 0; i < 100; ++i)
+      Arr[i] = i;
+\end{wideverbatim}
+
+In PicoLisp, this is equivalent to
+\begin{wideverbatim}
+   (setq List (range 1 100))
+\end{wideverbatim}
+
+
+Now let's increment each element:
+\begin{wideverbatim}
+   for (i = 0; i < 100; ++i)
+      ++Arr[i];
+\end{wideverbatim}
+
+The PicoLisp version would be
+\begin{wideverbatim}
+   (map inc List)
+\end{wideverbatim}
+
+but let's assume for a moment we have no mapping function, and insist on
+indexed access instead:
+\begin{wideverbatim}
+   (for N 100
+      (inc (nth List N)) )
+\end{wideverbatim}
+
+'\underline{nth}\footnote{http://software-lab.de/doc/refN.html\#nth}' is PicoLisp's idea of an
+indexed array access.
+
+Let's compare that to an analog O(1) access, by repeatedly accessing the
+first list element:
+\begin{wideverbatim}
+   (for N 100
+      (inc (nth List 1)) )
+\end{wideverbatim}
+
+The time difference will be the relative overhead for the O(N/2) access to
+indexed list elements.
+
+To get measurable timing results, we do each test ten thousand times. First the
+accesses to all list elements:
+\begin{wideverbatim}
+   : (bench
+      (do 10000
+         (for N 100
+            (inc (nth List N)) ) ) )
+   0.282 sec
+\end{wideverbatim}
+
+
+Then the ``simulation of an array data type'', by accessing only the first
+element:
+\begin{wideverbatim}
+   : (bench
+      (do 10000
+         (for N 100
+            (inc (nth List 1)) ) ) )
+   0.121 sec
+\end{wideverbatim}
+
+
+We can see, the results are in the same order of magnitude. The difference of
+161 milliseconds was the time actually spent in list traversals.
+
+In fact, the greatest part of execution time is taken by the interpreter
+overhead anyway. Compare this to a full-list increment using
+'\underline{map}\footnote{http://software-lab.de/doc/refM.html\#map}':
+\begin{wideverbatim}
+   : (bench
+      (do 10000
+         (map inc List) ) )
+   0.076 sec
+\end{wideverbatim}
+
+Of course the difference gets bigger if the list gets longer, but typically
+there will be also much more processing of the data than simple increments.
+
+Regarding all that, it should become clear that wasting tag bits and efforts for
+such a data type and its associated functions is not a good idea.

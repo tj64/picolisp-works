@@ -1,0 +1,3086 @@
+\title{PicoLisp Application Development}
+\input{mainmatter/authors/alex}
+\maketitle
+
+
+\begin{abstract}
+  This article presents an introduction to writing browser-based
+  applications in PicoLisp.
+
+  It concentrates on the XHTML/CSS GUI-Framework (as opposed to the
+  previous Java-AWT, Java-Swing and Plain-HTML frameworks), which is
+  easier to use, more flexible in layout design, and does not depend
+  on plug-ins, JavaScript or cookies.
+
+\end{abstract}
+
+\section{Introduction}
+\label{sec:appl-devel-introduction}
+
+A plain HTTP/HTML GUI has various advantages: It runs on any browser,
+and can be fully driven by scripts (``@lib/scrape.l'').
+
+To be precise: CSS \emph{can} be used to enhance the layout. And browsers
+\emph{with} JavaScript will respond faster and smoother. But this framework
+works just fine in browsers which do not know anything about CSS or
+JavaScript. All examples were also tested using the w3m text browser.
+
+For basic informations about the PicoLisp system please look at the
+\emph{PicoLisp Reference} and the \emph{PicoLisp Tutorial}. Knowledge of HTML, and a bit of CSS and HTTP is assumed.
+
+The examples assume that PicoLisp was started from a global installation
+(see \emph{Installation}).
+
+ 
+\section{Static Pages}
+\label{sec:appl-devel-static-pages}
+
+
+You can use PicoLisp to generate static HTML pages. This does not make
+much sense in itself, because you could directly write HTML code as
+well, but it forms the base for interactive applications, and allows us
+to introduce the application server and other fundamental concepts.
+
+ 
+\subsection{Hello World}
+\label{sec:appl-devel-hello-world}
+
+
+To begin with a minimal application, please enter the following two
+lines into a generic source file named ``project.l'' in the PicoLisp
+installation directory.
+
+
+\begin{wideverbatim}
+########################################################################
+(html 0 "Hello" "@lib.css" NIL
+   "Hello World!" )
+########################################################################
+\end{wideverbatim}
+
+(We will modify and use this file in all following examples and
+experiments. Whenever you find such a program snippet between hash (`\#')
+lines, just copy and paste it into your ``project.l'' file, and press the
+``reload'' button of your browser to view the effects)
+
+ 
+\subsubsection{ Start the application server}
+\label{sec:appl-devel-start-the-application-server}%
+Open a second terminal window, and start a PicoLisp application server
+
+
+\begin{wideverbatim}
+$ pil @lib/http.l @lib/xhtml.l @lib/form.l -'server 8080 "project.l"' +
+\end{wideverbatim}
+
+No prompt appears. The server just sits, and waits for connections. You
+can stop it later by hitting \texttt{Ctrl-C} in that terminal, or by executing
+ \texttt{killall pil}  in some other window.
+
+(In the following, we assume that this HTTP server is up and running)
+
+Now open the URL `\texttt{http://localhost:8080}' with your browser. You should
+see an empty page with a single line of text.
+
+
+\subsubsection{ How does it work?}
+\label{sec:appl-devel-how-does-it-work?}%
+The above line loads the debugger (via the `+' switch), the HTTP server
+code (``@lib/http.l''), the XHTML functions (``@lib/xhtml.l'') and the input
+form framework (``@lib/form.l'', it will be needed later for
+\emph{interactive forms}).
+
+Then the \texttt{server} function is called with a port number and a
+default URL. It will listen on that port for incoming HTTP requests in
+an endless loop. Whenever a GET request arrives on port 8080, the file
+``project.l'' will be \texttt{(load)}ed, causing the evaluation
+(\texttt{=} execution) of all its Lisp expressions.
+
+During that execution, all data written to the current output channel is
+sent directly to to the browser. The code in ``project.l'' is responsible
+to produce HTML (or anything else the browser can understand).
+
+\subsection{URL Syntax}
+\label{sec:appl-devel-url-syntax}
+
+The PicoLisp application server uses a slightly specialized syntax when
+communicating URLs to and from a client. The ``path'' part of an URL -
+which remains when
+
+\begin{itemize}
+\item the preceding protocol, host and port specifications,
+\item and the trailing question mark plus arguments
+\end{itemize}
+
+are stripped off - is interpreted according so some rules. The most
+prominent ones are:
+
+\begin{itemize}
+\item If a path starts with an exclamation-mark (`!'), the rest (without
+   the `!') is taken as the name of a Lisp function to be called. All
+   arguments following the question mark are passed to that function.
+\item If a path ends with ``.l'' (a dot and a lower case `L'), it is taken as
+   a Lisp source file name to be \texttt{(load)}ed. This is the most common
+   case, and we use it in our example ``project.l''.
+\item If the extension of a file name matches an entry in the global mime
+   type table \texttt{*Mimes}, the file is sent to the client with mime-type
+   and max-age values taken from that table.
+\item Otherwise, the file is sent to the client with a mime-type of
+   ``application/octet-stream'' and a max-age of 1 second.
+\end{itemize}
+
+An application is free to extend or modify the \texttt{*Mimes} table with the
+\texttt{mime} function. For example
+
+
+\begin{wideverbatim}
+(mime "doc" "application/msword" 60)
+\end{wideverbatim}
+
+defines a new mime type with a max-age of one minute.
+
+Argument values in URLs, following the path and the question mark, are
+encoded in such a way that Lisp data types are preserved:
+
+\begin{itemize}
+\item An internal symbol starts with a dollar sign (`\$')
+\item A number starts with a plus sign (`+')
+\item An external (database) symbol starts with dash (`-')
+\item A list (one level only) is encoded with underscores (`\_')
+\item Otherwise, it is a transient symbol (a plain string)
+\end{itemize}
+
+In that way, high-level data types can be directly passed to functions
+encoded in the URL, or assigned to global variables before a file is
+loaded.
+
+ 
+\subsection{Security}
+\label{sec:appl-devel-security}
+
+It is, of course, a huge security hole that - directly from the URL -
+any Lisp source file can be loaded, and any Lisp function can be called.
+For that reason, applications must take care to declare exactly which
+files and functions are to be allowed in URLs. The server checks a
+global variable \texttt{*Allow}, and - when its value is non \texttt{NIL} - denies
+access to anything that does not match its contents.
+
+Normally, \texttt{*Allow} is not manipulated directly, but set with the
+\texttt{allowed} and \texttt{allow} functions
+
+
+\begin{wideverbatim}
+(allowed ("app/")
+   "!start" "@lib.css" "customer.l" "article.l" )
+\end{wideverbatim}
+
+This is usually called in the beginning of an application, and allows
+access to the directory ``@img/'', to the function `start', and to the
+files ``@lib.css'', ``customer.l'' and ``article.l''.
+
+Later in the program, \texttt{*Allow} may be dynamically extended with \texttt{allow}
+
+
+\begin{wideverbatim}
+(allow "!foo")
+(allow "newdir/" T)
+\end{wideverbatim}
+
+This adds the function `foo', and the directory ``newdir/'', to the set of
+allowed items.
+
+
+\subsubsection{ The ``.pw'' File}
+\label{sec:appl-devel-the-pw-file}%
+
+For a variety of security checks (most notably for using the \texttt{psh}
+function, as in some later examples) it is necessary to create a file
+named ``.pw'' in the PicoLisp installation directory. This file should
+contain a single line of arbitrary data, to be used as a password for
+identifying local resources.
+
+The recommeded way to create this file is to call the \texttt{pw} function,
+defined in ``@lib/http.l''
+
+
+\begin{wideverbatim}
+$ pil @lib/http.l -'pw 12' -bye
+\end{wideverbatim}
+
+Please execute this command.
+
+\subsection{The \texttt{html} Function}
+\label{sec:appl-devel-the-html}
+
+
+Now back to our ``Hello World'' example. In principle, you could write
+``project.l'' as a sequence of print statements
+
+
+\begin{wideverbatim}
+########################################################################
+(prinl "HTTP/1.0 200 OK^M")
+(prinl "Content-Type: text/html; charset=utf-8")
+(prinl "^M")
+(prinl "<html>")
+(prinl "Hello World!")
+(prinl "</html>")
+########################################################################
+\end{wideverbatim}
+
+but using the \texttt{html} function is much more convenient.
+
+Moreover, \texttt{html} \textbf{is} nothing more than a printing function. You can see
+this easily if you connect a PicoLisp Shell (\texttt{psh}) to the server
+process (you must have generated a \emph{``.pw'' file} for this), and
+enter the \texttt{html} statement
+
+
+\begin{wideverbatim}
+$ /usr/lib/picolisp/bin/psh 8080
+: (html 0 "Hello" "@lib.css" NIL "Hello World!")
+HTTP/1.0 200 OK
+Server: PicoLisp
+Date: Fri, 29 Dec 2006 07:28:58 GMT
+Cache-Control: max-age=0
+Cache-Control: no-cache
+Content-Type: text/html; charset=utf-8
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lan="en" lang="en">
+<head>
+<title>Hello</title>
+<base href="http://localhost:8080/"/>
+<link rel="stylesheet" type="text/css" href="http://localhost:8080/@lib.css"/>
+</head>
+<body>Hello World!</body>
+</html>
+-> </html>
+:  # (type Ctrl-D here to terminate PicoLisp)
+\end{wideverbatim}
+
+These are the arguments to \texttt{html}:
+
+\begin{enumerate}
+\item \texttt{0}: A max-age value for cache-control (in seconds, zero means
+   ``no-cache''). You might pass a higher value for pages that change
+   seldom, or \texttt{NIL} for no cache-control at all.
+\item \texttt{''Hello''}: The page title. 
+\item \texttt{"@lib.css"}: A CSS-File name. Pass \texttt{NIL} if you
+  do not want to use any CSS-File, or a list of file names if you want
+  to give more than one CSS-File.
+\item \texttt{NIL}: A CSS style attribute specification (see the description of
+   \emph{CSS Attributes} below). It will be passed to the \texttt{body}
+   tag.
+\end{enumerate}
+
+After these four arguments, an arbitrary number of expressions may
+follow. They form the body of the resulting page, and are evaluated
+according to a special rule. This rule is slightly different from the
+evaluation of normal Lisp expressions:
+
+\begin{itemize}
+\item If an argument is an atom (a number or a symbol (string)), its value
+   is printed immediately.
+\item Otherwise (a list), it is evaluated as a Lisp function (typically
+   some form of print statement).
+\end{itemize}
+
+Therefore, our source file might as well be written as:
+
+
+\begin{wideverbatim}
+########################################################################
+(html 0 "Hello" "@lib.css" NIL
+   (prinl "Hello World!") )
+########################################################################
+\end{wideverbatim}
+
+The most typical print statements will be some HTML-tags:
+
+
+\begin{wideverbatim}
+########################################################################
+(html 0 "Hello" "@lib.css" NIL
+   (<h1> NIL "Hello World!")
+   (<br> "This is some text.")
+   (ht:Prin "And this is a number: " (+ 1 2 3)) )
+########################################################################
+\end{wideverbatim}
+
+\texttt{<h1>} and \texttt{<br>} are tag functions. \texttt{<h1>} takes a CSS attribute as its
+first argument.
+
+Note the use of \texttt{ht:Prin} instead of \texttt{prin}. \texttt{ht:Prin} should be used
+for all direct printing in HTML pages, because it takes care to escape
+special characters.
+
+ 
+\subsection{CSS Attributes}
+\label{sec:appl-devel-css-attributes}
+
+The \texttt{html} function above, and many of the HTML
+\emph{tag functions}, accept a CSS attribute specification. This may
+be either an atom, a cons pair, or a list of cons pairs. We demonstrate
+the effects with the \texttt{<h1>} tag function.
+
+An atom (usually a symbol or a string) is taken as a CSS class name
+
+
+\begin{wideverbatim}
+: (<h1> 'foo "Title")
+<h1 class="foo">Title</h1>
+\end{wideverbatim}
+
+For a cons pair, the CAR is taken as an attribute name, and the CDR as
+the attribute's value
+
+
+\begin{wideverbatim}
+: (<h1> '(id . bar) "Title")
+<h1 id="bar">Title</h1>
+\end{wideverbatim}
+
+Consequently, a list of cons pairs gives a set of attribute-value pairs
+
+
+\begin{wideverbatim}
+: (<h1> '((id . "abc") (lang . "de")) "Title")
+<h1 id="abc" lang="de">Title</h1>
+\end{wideverbatim}
+
+ 
+\subsection{Tag Functions}
+\label{sec:appl-devel-tag-functions}
+
+
+All pre-defined XHTML tag functions can be found in ``@lib/xhtml.l''. We
+recommend to look at their sources, and to experiment a bit, by
+executing them at a PicoLisp prompt, or by pressing the browser's
+``Reload'' button after editing the ``project.l'' file.
+
+For a suitable PicoLisp prompt, either execute (in a separate terminal
+window) the PicoLisp Shell (\texttt{psh}) command (works only if the
+application server is running, and you did generate a \emph{``.pw'' file})
+
+
+\begin{wideverbatim}
+$ /usr/lib/picolisp/bin/psh 8080
+:
+\end{wideverbatim}
+
+or start the interpreter stand-alone, with ``@lib/xhtml.l'' loaded
+
+
+\begin{wideverbatim}
+$ pil @lib/http.l @lib/xhtml.l +
+:
+\end{wideverbatim}
+
+Note that for all these tag functions the above \emph{tag body evaluation rule} applies.
+
+\subsubsection{ Simple Tags}
+\label{sec:appl-devel-simple-tags}%
+Most tag functions are simple and straightforward. Some of them just
+print their arguments
+
+
+\begin{wideverbatim}
+: (<br> "Hello world")
+Hello world<br/>
+
+: (<em> "Hello world")
+<em>Hello world</em>
+\end{wideverbatim}
+
+while most of them take a \emph{CSS attribute specification} as
+their first argument (like the \texttt{<h1>} tag above)
+
+
+\begin{wideverbatim}
+: (<div> 'main "Hello world")
+<div class="main">Hello world</div>
+
+: (<p> NIL "Hello world")
+<p>Hello world</p>
+
+: (<p> 'info "Hello world")
+<p class="info">Hello world</p>
+\end{wideverbatim}
+
+All of these functions take an arbitrary number of arguments, and may
+nest to an arbitrary depth (as long as the resulting HTML is legal)
+
+
+\begin{wideverbatim}
+: (<div> 'main
+   (<h1> NIL "Head")
+   (<p> NIL
+      (<br> "Line 1")
+      "Line"
+      (<nbsp>)
+      (+ 1 1) ) )
+<div class="main"><h1>Head</h1>
+<p>Line 1<br/>
+Line 2</p>
+</div>
+\end{wideverbatim}
+
+\subsubsection{ (Un)ordered Lists}
+\label{sec:appl-devel-(un)ordered-lists}%
+HTML-lists, implemented by the \texttt{<ol>} and \texttt{<ul>} tags, let you define
+hierarchical structures. You might want to paste the following code into
+your copy of ``project.l'':
+
+
+\begin{wideverbatim}
+########################################################################
+(html 0 "Unordered List" "@lib.css" NIL
+   (<ul> NIL
+      (<li> NIL "Item 1")
+      (<li> NIL
+         "Sublist 1"
+         (<ul> NIL
+            (<li> NIL "Item 1-1")
+            (<li> NIL "Item 1-2") ) )
+      (<li> NIL "Item 2")
+      (<li> NIL
+         "Sublist 2"
+         (<ul> NIL
+            (<li> NIL "Item 2-1")
+            (<li> NIL "Item 2-2") ) )
+      (<li> NIL "Item 3") ) )
+########################################################################
+\end{wideverbatim}
+
+Here, too, you can put arbitrary code into each node of that tree,
+including other tag functions.
+
+
+\subsubsection{ Tables}
+\label{sec:appl-devel-tables}%
+
+Like the hierarchical structures with the list functions, you can
+generate two-dimensional tables with the \texttt{<table>} and \texttt{<row>}
+functions.
+
+The following example prints a table of numbers and their squares:
+
+
+\begin{wideverbatim}
+########################################################################
+(html 0 "Table" "@lib.css" NIL
+   (<table> NIL NIL NIL
+      (for N 10                                    # A table with 10 rows
+         (<row> NIL N (prin (* N N))) ) ) )     # and 2 columns
+########################################################################
+\end{wideverbatim}
+
+The first argument to \texttt{<table>} is the usual CSS attribute, the second
+an optional title (``caption''), and the third an optional list specifying
+the column headers. In that list, you may supply a list for a each
+column, with a CSS attribute in its CAR, and a tag body in its CDR for
+the contents of the column header.
+
+The body of \texttt{<table>} contains calls to the \texttt{<row>} function. This
+function is special in that each expression in its body will go to a
+separate column of the table. If both for the column header and the row
+function an CSS attribute is given, they will be combined by a space and
+passed to the HTML \texttt{<td>} tag. This permits distinct CSS specifications
+for each column and row.
+
+As an extension of the above table example, let's pass some attributes
+for the table itself (not recommended - better define such styles in a
+CSS file and then just pass the class name to \texttt{<table>}), right-align
+both columns, and print each row in an alternating red and blue color
+
+
+\begin{wideverbatim}
+########################################################################
+(html 0 "Table" "@lib.css" NIL
+   (<table>
+      '((width . "200px") (style . "border: dotted 1px;"))    # table style
+      "Square Numbers"                                        # caption
+      '((align "Number") (align "Square"))                    # 2 headers
+      (for N 10                                                  # 10 rows
+         (<row> (xchg '(red) '(blue))                         # red or blue
+            N                                                 # 2 columns
+            (prin (* N N) ) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+If you wish to concatenate two or more cells in a table, so that a
+single cell spans several columns, you can pass the symbol  \texttt{-}  for the
+additional cell data to \texttt{<row>}. This will cause the data given to the
+left of the  \texttt{-}  symbols to expand to the right.
+
+You can also directly specify table structures with the simple \texttt{<th>},
+\texttt{<tr>} and \texttt{<td>} tag functions.
+
+If you just need a two-dimensional arrangement of components, the even
+simpler \texttt{<grid>} function might be convenient:
+
+
+\begin{wideverbatim}
+########################################################################
+(html 0 "Grid" "@lib.css" NIL
+   (<grid> 3
+      "A" "B" "C"
+      123 456 789 ) )
+########################################################################
+\end{wideverbatim}
+
+It just takes a specification for the number of columns (here: 3) as its
+first argument, and then a single expression for each cell. Instead of a
+number, you can also pass a list of CSS attributes. Then the length of
+that list will determine the number of columns. You can change the
+second line in the above example to
+
+
+\begin{wideverbatim}
+(<grid> '(NIL NIL right)
+\end{wideverbatim}
+
+Then the third column will be right aligned.
+
+\subsubsection{ Menus and Tabs}
+\label{sec:appl-devel-menus-and-tabs}%
+
+The two most powerful tag functions are \texttt{<menu>} and \texttt{<tab>}. Used
+separately or in combination, they form a navigation framework with
+
+\begin{itemize}
+\item menu items which open and close submenus
+\item submenu items which switch to different pages
+\item tabs which switch to different subpages
+\end{itemize}
+
+The following example is not very useful, because the URLs of all items
+link to the same ``project.l'' page, but it should suffice to demonstrate
+the functionality:
+
+
+\begin{wideverbatim}
+########################################################################
+(html 0 "Menu+Tab" "@lib.css" NIL
+   (<div> '(id . menu)
+      (<menu>
+         ("Item" "project.l")                      # Top level item
+         (NIL (<hr>))                              # Plain HTML
+         (T "Submenu 1"                            # Submenu
+            ("Subitem 1.1" "project.l")
+            (T "Submenu 1.2"
+               ("Subitem 1.2.1" "project.l")
+               ("Subitem 1.2.2" "project.l")
+               ("Subitem 1.2.3" "project.l") )
+            ("Subitem 1.3" "project.l") )
+         (T "Submenu 2"
+            ("Subitem 2.1" "project.l")
+            ("Subitem 2.2" "project.l") ) ) )
+   (<div> '(id . main)
+      (<h1> NIL "Menu+Tab")
+      (<tab>
+         ("Tab1"
+            (<h3> NIL "This is Tab 1") )
+         ("Tab2"
+            (<h3> NIL "This is Tab 2") )
+         ("Tab3"
+            (<h3> NIL "This is Tab 3") ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+\texttt{<menu>} takes a sequence of menu items. Each menu item is a list, with
+its CAR either
+
+\begin{itemize}
+\item \texttt{NIL}: The entry is not an active menu item, and the rest of the list
+   may consist of arbitrary code (usually HTML tags).
+\item \texttt{T}: The second element is taken as a submenu name, and a click on
+   that name will open or close the corresponding submenu. The rest of
+   the list recursively specifies the submenu items (may nest to
+   arbitrary depth).
+\item Otherwise: The menu item specifies a direct action (instead of
+   opening a submenu), where the first list element gives the item's
+   name, and the second element the corresponding URL.
+\end{itemize}
+
+\texttt{<tab>} takes a list of subpages. Each page is simply a tab name,
+followed by arbitrary code (typically HTML tags).
+
+Note that only a single menu and a single tab may be active at the same
+time.
+
+
+\section{Interactive Forms}
+\label{sec:appl-devel-interactive-forms}
+
+
+In HTML, the only possibility for user input is via \texttt{<form>} and
+\texttt{<input>} elements, using the HTTP POST method to communicate with the
+server.
+
+``@lib/xhtml.l'' defines a function called \texttt{<post>}, and a collection of
+input tag functions, which allow direct programming of HTML forms. We
+will supply only one simple example:
+
+
+\begin{wideverbatim}
+########################################################################
+(html 0 "Simple Form" "@lib.css" NIL
+   (<post> NIL "project.l"
+      (<field> 10 '*Text)
+      (<submit> "Save") ) )
+########################################################################
+\end{wideverbatim}
+
+This associates a text input field with a global variable \texttt{*Text}. The
+field displays the current value of \texttt{*Text}, and pressing the submit
+button causes a reload of ``project.l'' with \texttt{*Text} set to any string
+entered by the user.
+
+An application program could then use that variable to do something
+useful, for example store its value in a database.
+
+The problem with such a straightforward use of forms is that
+
+\begin{enumerate}
+\item they require the application programmer to take care of maintaining
+   lots of global variables. Each input field on the page needs an
+   associated variable for the round trip between server and client.
+\item they do not preserve an application's internal state. Each POST
+   request spawns an individual process on the server, which sets the
+   global variables to their new values, generates the HTML page, and
+   terminates thereafter. The application state has to be passed along
+   explicitly, e.g. using \texttt{<hidden>} tags.
+\item they are not very interactive. There is typically only a single
+   submit button. The user fills out a possibly large number of input
+   fields, but changes will take effect only when the submit button is
+   pressed.
+\end{enumerate}
+
+Though we wrote a few applications in that style, we recommend the GUI
+framework provided by ``@lib/form.l''. It does not need any variables for
+the client/server communication, but implements a class hierarchy of GUI
+components for the abstraction of application logic, button actions and
+data linkage.
+
+ 
+\subsection{Sessions}
+\label{sec:appl-devel-sessions}
+
+
+First of all, we need to establish a persistent environment on the
+server, to handle each individual session (for each connected client).
+
+Technically, this is just a child process of the server we started
+\emph{above}, which does not terminate immediately after it sent
+its page to the browser. It is achieved by calling the \texttt{app} function
+somewhere in the application's startup code.
+
+
+\begin{wideverbatim}
+########################################################################
+(app)  # Start a session
+
+(html 0 "Simple Session" "@lib.css" NIL
+   (<post> NIL "project.l"
+      (<field> 10 '*Text)
+      (<submit> "Save") ) )
+########################################################################
+\end{wideverbatim}
+
+Nothing else changed from the previous example. However, when you
+connect your browser and then look at the terminal window where you
+started the application server, you'll notice a colon, the PicoLisp
+prompt
+
+
+\begin{wideverbatim}
+$ pil @lib/http.l @lib/xhtml.l @lib/form.l -'server 8080 "project.l"' +
+:
+\end{wideverbatim}
+
+Tools like the Unix \texttt{ps} utility will tell you that now two \texttt{picolisp}
+processes are running, the first being the parent of the second.
+
+If you enter some text, say ``abcdef'', into the text field in the browser
+window, press the submit button, and inspect the Lisp \texttt{*Text} variable,
+
+
+\begin{wideverbatim}
+: *Text
+-> "abcdef"
+\end{wideverbatim}
+
+you see that we now have a dedicated PicoLisp process, ``connected'' to
+the client.
+
+You can terminate this process (like any interactive PicoLisp) by
+hitting \texttt{Ctrl-D} on an empty line. Otherwise, it will terminate by
+itself if no other browser requests arrive within a default timeout
+period of 5 minutes.
+
+To start a (non-debug) production version, the server is commonly
+started without the `+' flag, and with \texttt{-wait}
+
+
+\begin{wideverbatim}
+$ pil @lib/http.l @lib/xhtml.l @lib/form.l -'server 8080 "project.l"' -wait
+\end{wideverbatim}
+
+In that way, no command line prompt appears when a client connects.
+
+ 
+\subsection{Action Forms}
+\label{sec:appl-devel-action-forms}
+
+
+Now that we have a persistent session for each client, we can set up an
+active GUI framework.
+
+This is done by wrapping the call to the \texttt{html} function with \texttt{action}.
+Inside the body of \texttt{html} can be - in addition to all other kinds of tag
+functions - one or more calls to \texttt{form}
+
+
+\begin{wideverbatim}
+########################################################################
+(app)                                              # Start session
+
+(action                                            # Action handler
+   (html 0 "Form" "@lib.css" NIL                   # HTTP/HTML protocol
+      (form NIL                                    # Form
+         (gui 'a '(+TextField) 10)                 # Text Field
+         (gui '(+Button) "Print"                   # Button
+            '(msg (val> (: home a))) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+Note that there is no longer a global variable like \texttt{*Text} to hold the
+contents of the input field. Instead, we gave a local, symbolic name
+ \texttt{a}  to a \texttt{+TextField} component
+
+
+\begin{wideverbatim}
+(gui 'a '(+TextField) 10)                 # Text Field
+\end{wideverbatim}
+
+Other components can refer to it
+
+
+\begin{wideverbatim}
+'(msg (val> (: home a)))
+\end{wideverbatim}
+
+\texttt{(: home)} is always the form which contains this GUI component. So
+\texttt{(: home a)} evaluates to the component  \texttt{a}  in the current form. As
+\texttt{msg} prints its argument to standard error, and the \texttt{val>} method
+retrieves the current contents of a component, we will see on the
+console the text typed into the text field when we press the button.
+
+An \texttt{action} without embedded  \texttt{form}s - or a \texttt{form} without a surrounding
+\texttt{action} - does not make much sense by itself. Inside \texttt{html} and \texttt{form},
+however, calls to HTML functions (and any other Lisp functions, for that
+matter) can be freely mixed.
+
+In general, a typical page may have the form
+
+
+\begin{wideverbatim}
+(action                                            # Action handler
+   (html ..                                        # HTTP/HTML protocol
+      (<h1> ..)                                    # HTML tags
+      (form NIL                                    # Form
+         (<h3> ..)
+         (gui ..)                                  # GUI component(s)
+         (gui ..)
+         .. )
+      (<h2> ..)
+      (form NIL                                    # Another form
+         (<h3> ..)
+         (gui ..)                                  # GUI component(s)
+         .. )
+      (<br> ..)
+      .. ) )
+\end{wideverbatim}
+
+
+\subsubsection{ The \texttt{gui} Function}
+\label{sec:appl-devel-the-gui}%
+
+The most prominent function in a \texttt{form} body is \texttt{gui}. It is the
+workhorse of GUI construction.
+
+Outside of a \texttt{form} body, \texttt{gui} is undefined. Otherwise, it takes an
+optional alias name, a list of classes, and additional arguments as
+needed by the constructors of these classes. We saw this example before
+
+
+\begin{wideverbatim}
+(gui 'a '(+TextField) 10)                 # Text Field
+\end{wideverbatim}
+
+Here,  \texttt{a}  is an alias name for a component of type \texttt{(+TextField)}. The
+numeric argument \texttt{10} is passed to the text field, specifying its width.
+See the chapter on \emph{GUI Classes} for more examples.
+
+During a GET request, \texttt{gui} is basically a front-end to \texttt{new}. It builds
+a component, stores it in the internal structures of the current form,
+and initializes it by sending the \texttt{init>} message to the component.
+Finally, it sends it the \texttt{show>} message, to produce HTML code and
+transmit it to the browser.
+
+During a POST request, \texttt{gui} does not build any new components. Instead,
+the existing components are re-used. So \texttt{gui} does not have much more to
+do than sending the \texttt{show>} message to a component.
+
+\subsubsection{ Control Flow}
+\label{sec:appl-devel-control-flow}%
+
+HTTP has only two methods to change a browser window: GET and POST. We
+employ these two methods in a certain defined, specialized way:
+
+\begin{itemize}
+\item GET means, a \textbf{new page} is being constructed. It is used when a page
+   is visited for the first time, usually by entering an URL into the
+   browser's address field, or by clicking on a link (which is often a
+   \emph{submenu item or tab}).
+\item POST is always directed to the \textbf{same page}. It is triggered by a
+   button press, updates the corresponding form's data structures, and
+   executes that button's action code.
+\end{itemize}
+
+A button's action code can do almost anything: Read and modify the
+contents of input fields, communicate with the database, display alerts
+and dialogs, or even fake the POST request to a GET, with the effect of
+showing a completely different document (See \emph{Switching URLs}).
+
+GET builds up all GUI components on the server. These components are
+objects which encapsulate state and behavior of the HTML page in the
+browser. Whenever a button is pressed, the page is reloaded via a POST
+request. Then - before any output is sent to the browser - the \texttt{action}
+function takes control. It performs error checks on all components,
+processes possible user input on the HTML page, and stores the values in
+correct format (text, number, date, object etc.) in each component.
+
+The state of a form is preserved over time. When the user returns to a
+previous page with the browser's BACK button, that state is reactivated,
+and may be POSTed again.
+
+The following silly example displays two text fields. If you enter some
+text into the ``Source'' field, you can copy it in upper or lower case to
+the ``Destination'' field by pressing one of the buttons
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(action
+   (html 0 "Case Conversion" "@lib.css" NIL
+      (form NIL
+         (<grid> 2
+            "Source" (gui 'src '(+TextField) 30)
+            "Destination" (gui 'dst '(+Lock +TextField) 30) )
+         (gui '(+JS +Button) "Upper Case"
+            '(set> (: home dst)
+               (uppc (val> (: home src))) ) )
+         (gui '(+JS +Button) "Lower Case"
+            '(set> (: home dst)
+               (lowc (val> (: home src))) ) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+The \texttt{+Lock} prefix class in the ``Destination'' field makes that field
+read-only. The only way to get some text into that field is by using one
+of the buttons.
+
+\subsubsection{ Switching URLs}
+\label{sec:appl-devel-switching-urls}%
+
+Because an action code runs before \texttt{html} has a chance to output an HTTP
+header, it can abort the current page and present something different to
+the user. This might, of course, be another HTML page, but would not be
+very interesting as a normal link would suffice. Instead, it can cause
+the download of dynamically generated data.
+
+The next example shows a text area and two buttons. Any text entered
+into the text area is exported either as a text file via the first
+button, or a PDF document via the second button
+
+
+\begin{wideverbatim}
+########################################################################
+(load "@lib/ps.l")
+
+(app)
+
+(action
+   (html 0 "Export" "@lib.css" NIL
+      (form NIL
+         (gui '(+TextField) 30 8)
+         (gui '(+Button) "Text"
+            '(let Txt (tmp "export.txt")
+               (out Txt (prinl (val> (: home gui 1))))
+               (url Txt) ) )
+         (gui '(+Button) "PDF"
+            '(psOut NIL "foo"
+               (a4)
+               (indent 40 40)
+               (down 60)
+               (hline 3)
+               (font (14 . "Times-Roman")
+                  (ps (val> (: home gui 1))) )
+               (hline 3)
+               (page) ) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+(a text area is built when you supply two numeric arguments (columns and
+rows) to a \texttt{+TextField} class)
+
+The action code of the first button creates a temporary file (i.e. a
+file named ``export.txt'' in the current process's temporary space),
+prints the value of the text area (this time we did not bother to give
+it a name, we simply refer to it as the form's first gui list element)
+into that file, and then calls the \texttt{url} function with the file name.
+
+The second button uses the PostScript library ``@lib/ps.l'' to create a
+temporary file ``foo.pdf''. Here, the temporary file creation and the call
+to the \texttt{url} function is hidden in the internal mechanisms of \texttt{psOut}.
+The effect is that the browser receives a PDF document and displays it.
+
+
+\subsubsection{ Alerts and Dialogs}
+\label{sec:appl-devel-alerts-and-dialogs}%
+
+Alerts and dialogs are not really what they used to be ;-)
+
+They do not ``pop up''. In this framework, they are just a kind of
+simple-to-use, pre-fabricated form. They can be invoked by a button's
+action code, and appear always on the current page, immediately
+preceding the form which created them.
+
+Let's look at an example which uses two alerts and a dialog. In the
+beginning, it displays a simple form, with a locked text field, and two
+buttons
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(action
+   (html 0 "Alerts and Dialogs" "@lib.css" NIL
+      (form NIL
+         (gui '(+Init +Lock +TextField) "Initial Text" 20 "My Text")
+         (gui '(+Button) "Alert"
+            '(alert NIL "This is an alert " (okButton)) )
+         (gui '(+Button) "Dialog"
+            '(dialog NIL
+               (<br> "This is a dialog.")
+               (<br>
+                  "You can change the text here "
+                  (gui '(+Init +TextField) (val> (: top 1 gui 1)) 20) )
+               (<br> "and then re-submit it to the form.")
+               (gui '(+Button) "Re-Submit"
+                  '(alert NIL "Are you sure? "
+                     (yesButton
+                        '(set> (: home top 2 gui 1)
+                           (val> (: home top 1 gui 1)) ) )
+                     (noButton) ) )
+               (cancelButton) ) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+The \texttt{+Init} prefix class initializes the ``My Text'' field with the string
+``Initial Text''. As the field is locked, you cannot modify this value
+directly.
+
+The first button brings up an alert saying ``This is an alert.''. You can
+dispose it by pressing ``OK''.
+
+The second button brings up a dialog with an editable text field,
+containing a copy of the value from the form's locked text field. You
+can modify this value, and send it back to the form, if you press
+``Re-Submit'' and answer ``Yes'' to the ``Are you sure?'' alert.
+
+
+\subsubsection{ A Calculator Example}
+\label{sec:appl-devel-a-calculator-example}%
+
+Now let's forget our ``project.l'' test file for a moment, and move on to
+a more substantial and practical, stand-alone, example. Using what we
+have learned so far, we want to build a simple bignum calculator.
+(``bignum'' because PicoLisp can do \emph{only} bignums)
+
+It uses a single form, a single numeric input field, and lots of
+buttons. It can be found in the PicoLisp distribution (e.g. under
+``/usr/share/picolisp/'') in ``misc/calc.l'', together with a directly
+executable wrapper script ``misc/calc''.
+
+To use it, change to the PicoLisp installation directory, and start it
+as
+
+
+\begin{wideverbatim}
+$ misc/calc
+\end{wideverbatim}
+
+or call it with an absolute path, e.g.
+
+
+\begin{wideverbatim}
+$ /usr/share/picolisp/misc/calc
+\end{wideverbatim}
+
+If you like to get a PicoLisp prompt for inspection, start it instead as
+
+
+\begin{wideverbatim}
+$ pil misc/calc.l -main -go +
+\end{wideverbatim}
+
+Then - as before - point your browser to `\texttt{http://localhost:8080}'.
+
+The code for the calculator logic and the GUI is rather straightforward.
+The entry point is the single function \texttt{calculator}. It is called
+directly (as described in \emph{URL Syntax}) as the server's
+default URL, and implicitly in all POST requests. No further file access
+is needed once the calculator is running.
+
+Note that for a production application, we inserted an allow-statement
+(as recommended by the \emph{Security} chapter)
+
+
+\begin{wideverbatim}
+(allowed NIL "!calculator" "@lib.css")
+\end{wideverbatim}
+
+at the beginning of ``misc/calc.l''. This will restrict external access to
+that single function.
+
+The calculator uses three global variables, \texttt{*Init}, \texttt{*Accu} and
+\texttt{*Stack}. \texttt{*Init} is a boolean flag set by the operator buttons to
+indicate that the next digit should initialize the accumulator to zero.
+\texttt{*Accu} is the accumulator. It is always displayed in the numeric input
+field, accepts user input, and it holds the results of calculations.
+\texttt{*Stack} is a push-down stack, holding postponed calculations
+(operators, priorities and intermediate results) with lower-priority
+operators, while calculations with higher-priority operators are
+performed.
+
+The function \texttt{digit} is called by the digit buttons, and adds another
+digit to the accumulator.
+
+The function \texttt{calc} does an actual calculation step. It pops the stack,
+checks for division by zero, and displays an error alert if necessary.
+
+\texttt{operand} processes an operand button, accepting a function and a
+priority as arguments. It compares the priority with that in the
+top-of-stack element, and delays the calculation if it is less.
+
+\texttt{finish} is used to calculate the final result.
+
+The \texttt{calculator} function has one numeric input field, with a width of
+60 characters
+
+
+\begin{wideverbatim}
+(gui '(+Var +NumField) '*Accu 60)
+\end{wideverbatim}
+
+The \texttt{+Var} prefix class associates this field with the global variable
+\texttt{*Accu}. All changes to the field will show up in that variable, and
+modification of that variable's value will appear in the field.
+
+The square root operator button has an \texttt{+Able} prefix class
+
+
+\begin{wideverbatim}
+(gui '(+Able +JS +Button) '(ge0 *Accu) (char 8730)
+   '(setq *Accu (sqrt *Accu)) )
+\end{wideverbatim}
+
+with an argument expression which checks that the current value in the
+accumulator is positive, and disables the button if otherwise.
+
+The rest of the form is just an array (grid) of buttons, encapsulating
+all functionality of the calculator. The user can enter numbers into the
+input field, either by using the digit buttons, or by directly typing
+them in, and perform calculations with the operator buttons. Supported
+operations are addition, subtraction, multiplication, division, sign
+inversion, square root and power (all in bignum integer arithmetic). The
+ \texttt{C}  button just clears the accumulator, while the  \texttt{A}  button also
+clears all pending calculations.
+
+All that in 53 lines of code!
+
+\subsection{Charts}
+\label{sec:appl-devel-charts}
+
+Charts are virtual components, maintaining the internal representation
+of two-dimensional data.
+
+Typically, these data are nested lists, database selections, or some
+kind of dynamically generated tabular information. Charts make it
+possible to view them in rows and columns (usually in HTML
+\emph{tables}), scroll up and down, and associate them with their
+corresponding visible GUI components.
+
+In fact, the logic to handle charts makes up a substantial part of the
+whole framework, with large impact on all internal mechanisms. Each GUI
+component must know whether it is part of a chart or not, to be able to
+handle its contents properly during updates and user interactions.
+
+Let's assume we want to collect textual and numerical data. We might
+create a table
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(action
+   (html 0 "Table" "@lib.css" NIL
+      (form NIL
+         (<table> NIL NIL '((NIL "Text") (NIL "Number"))
+            (do 4
+               (<row> NIL
+                  (gui '(+TextField) 20)
+                  (gui '(+NumField) 10) ) ) )
+         (<submit> "Save") ) ) )
+########################################################################
+\end{wideverbatim}
+
+with two columns ``Text'' and ``Number'', and four rows, each containing a
+\texttt{+TextField} and a \texttt{+NumField}.
+
+You can enter text into the first column, and numbers into the second.
+Pressing the ``Save'' button stores these values in the components on the
+server (or produces an error message if a string in the second column is
+not a legal number).
+
+There are two problems with this solution:
+
+\begin{enumerate}
+\item Though you can get at the user input for the individual fields, e.g.
+
+
+\begin{wideverbatim}
+: (val> (get *Top 'gui 2))  # Value in the first row, second column
+-> 123
+\end{wideverbatim}
+
+   there is no direct way to get the whole data structure as a single
+   list. Instead, you have to traverse all GUI components and collect
+   the data.
+\item The user cannot input more than four rows of data, because there is
+   no easy way to scroll down and make space for more.
+\end{enumerate}
+
+A chart can handle these things:
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(action
+   (html 0 "Chart" "@lib.css" NIL
+      (form NIL
+         (gui '(+Chart) 2)                         # Inserted a +Chart
+         (<table> NIL NIL '((NIL "Text") (NIL "Number"))
+            (do 4
+               (<row> NIL
+                  (gui 1 '(+TextField) 20)         # Inserted '1'
+                  (gui 2 '(+NumField) 10) ) ) )    # Inserted '2'
+         (<submit> "Save") ) ) )
+########################################################################
+\end{wideverbatim}
+
+Note that we inserted a \texttt{+Chart} component before the GUI components
+which should be managed by the chart. The argument `2' tells the chart
+that it has to expect two columns.
+
+Each component got an index number (here `1' and `2') as the first
+argument to \texttt{gui}, indicating the column into which this component
+should go within the chart.
+
+Now - if you entered ``a'', ``b'' and ``c'' into the first, and 1, 2, and 3
+into the second column - we can retrieve the chart's complete contents
+by sending it the \texttt{val>} message
+
+
+\begin{wideverbatim}
+: (val> (get *Top 'chart 1))  # Retrieve the value of the first chart
+-> (("a" 1) ("b" 2) ("c" 3))
+\end{wideverbatim}
+
+BTW, a more convenient function is \texttt{chart}
+
+
+\begin{wideverbatim}
+: (val> (chart))  # Retrieve the value of the current chart
+-> (("a" 1) ("b" 2) ("c" 3))
+\end{wideverbatim}
+
+\texttt{chart} can be used instead of the above construct when we want to
+access the ``current'' chart, i.e. the chart most recently processed in
+the current form.
+
+
+\subsubsection{ Scrolling}
+\label{sec:appl-devel-scrolling}%
+
+To enable scrolling, let's also insert two buttons. We use the
+pre-defined classes \texttt{+UpButton} and \texttt{+DnButton}
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(action
+   (html 0 "Scrollable Chart" "@lib.css" NIL
+      (form NIL
+         (gui '(+Chart) 2)
+         (<table> NIL NIL '((NIL "Text") (NIL "Number"))
+            (do 4
+               (<row> NIL
+                  (gui 1 '(+TextField) 20)
+                  (gui 2 '(+NumField) 10) ) ) )
+         (gui '(+UpButton) 1)                   # Inserted two buttons
+         (gui '(+DnButton) 1)
+         (----)
+         (<submit> "Save") ) ) )
+########################################################################
+\end{wideverbatim}
+
+to scroll down and up a single (argument `1') line at a time.
+
+Now it is possible to enter a few rows of data, scroll down, and
+continue. It is not necessary (except in the beginning, when the scroll
+buttons are still disabled) to press the ``Save'' button, because \textbf{any}
+button in the form will send changes to the server's internal structures
+before any action is performed.
+
+\subsubsection{ Put and Get Functions}
+\label{sec:appl-devel-put-and-get-functions}%
+
+As we said, a chart is a virtual component to edit two-dimensional data.
+Therefore, a chart's native data format is a list of lists: Each sublist
+represents a single row of data, and each element of a row corresponds
+to a single GUI component.
+
+In the example above, we saw a row like
+
+
+\begin{wideverbatim}
+("a" 1)
+\end{wideverbatim}
+
+being mapped to
+
+
+\begin{wideverbatim}
+(gui 1 '(+TextField) 20)
+(gui 2 '(+NumField) 10)
+\end{wideverbatim}
+
+Quite often, however, such a one-to-one relationship is not desired. The
+internal data structures may have to be presented in a different form to
+the user, and user input may need conversion to an internal
+representation.
+
+For that, a chart accepts - in addition to the ``number of columns''
+argument - two optional function arguments. The first function is
+invoked to `put' the internal representation into the GUI components,
+and the second to `get' data from the GUI into the internal
+representation.
+
+A typical example is a chart displaying customers in a database. While
+the internal representation is a (one-dimensional) list of customer
+objects, `put' expands each object to a list with, say, the customer's
+first and second name, telephone number, address and so on. When the
+user enters a customer's name, `get' locates the matching object in the
+database and stores it in the internal representation. In the following,
+`put' will in turn expand it to the GUI.
+
+For now, let's stick with a simpler example: A chart that holds just a
+list of numbers, but expands in the GUI to show also a textual form of
+each number (in German).
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(load "@lib/zahlwort.l")
+
+(action
+   (html 0 "Numerals" "@lib.css" NIL
+      (form NIL
+         (gui '(+Init +Chart) (1 5 7) 2
+            '((N) (list N (zahlwort N)))
+            car )
+         (<table> NIL NIL '((NIL "Numeral") (NIL "German"))
+            (do 4
+               (<row> NIL
+                  (gui 1 '(+NumField) 9)
+                  (gui 2 '(+Lock +TextField) 90) ) ) )
+         (gui '(+UpButton) 1)
+         (gui '(+DnButton) 1)
+         (----)
+         (<submit> "Save") ) ) )
+########################################################################
+\end{wideverbatim}
+
+``@lib/zahlwort.l'' defines the utility function \texttt{zahlwort}, which is
+required later by the `put' function. \texttt{zahlwort} accepts a number and
+returns its wording in German.
+
+Now look at the code
+
+
+\begin{wideverbatim}
+(gui '(+Init +Chart) (1 5 7) 2
+   '((N) (list N (zahlwort N)))
+   car )
+\end{wideverbatim}
+
+We prefix the \texttt{+Chart} class with \texttt{+Init}, and pass it a list of numbers
+\texttt{(1 5 7)} for the initial value of the chart. Then, following the `2'
+(the chart has two columns), we pass a `put' function
+
+
+\begin{wideverbatim}
+'((N) (list N (zahlwort N)))
+\end{wideverbatim}
+
+which takes a number and returns a list of that number and its wording,
+and a `get' function
+
+
+\begin{wideverbatim}
+car )
+\end{wideverbatim}
+
+which in turn accepts such a list and returns a number, which happens to
+be the list's first element.
+
+You can see from this example that `get' is the inverse function of
+`put'. `get' can be omitted, however, if the chart is read-only
+(contains no (or only locked) input fields).
+
+The field in the second column
+
+
+\begin{wideverbatim}
+(gui 2 '(+Lock +TextField) 90) ) ) )
+\end{wideverbatim}
+
+is locked, because it displays the text generated by `put', and is not
+supposed to accept any user input.
+
+When you start up this form in your browser, you'll see three pre-filled
+lines with ``1/eins'', ``5/f\"unf'' and ``7/sieben'', according to the \texttt{+Init}
+argument \texttt{(1 5 7)}. Typing a number somewhere into the first column, and
+pressing ENTER or one of the buttons, will show a suitable text in the
+second column.
+
+
+\section{GUI Classes}
+\label{sec:appl-devel-gui-classes}
+
+In previous chapters we saw examples of GUI classes like \texttt{+TextField},
+\texttt{+NumField} or \texttt{+Button}, often in combination with prefix classes like
+\texttt{+Lock}, \texttt{+Init} or \texttt{+Able}. Now we take a broader look at the whole
+hierarchy, and try more examples.
+
+The abstract class \texttt{+gui} is the base of all GUI classes. A live view of
+the class hierarchy can be obtained with the \texttt{dep} (``dependencies'')
+function:
+
+
+\begin{wideverbatim}
+: (dep '+gui)
++gui
+   +JsField
+   +Button
+      +UpButton
+      +PickButton
+         +DstButton
+      +ClrButton
+      +ChoButton
+         +Choice
+      +GoButton
+      +BubbleButton
+      +DelRowButton
+      +ShowButton
+      +DnButton
+   +Img
+   +field
+      +Checkbox
+      +TextField
+         +FileField
+         +ClassField
+         +numField
+            +NumField
+            +FixField
+         +BlobField
+         +DateField
+         +SymField
+         +UpField
+         +MailField
+         +SexField
+         +AtomField
+         +PwField
+         +ListTextField
+         +LinesField
+         +TelField
+         +TimeField
+         +HttpField
+      +Radio
+-> +gui
+\end{wideverbatim}
+
+We see, for example, that \texttt{+DnButton} is a subclass of \texttt{+Button}, which
+in turn is a subclass of \texttt{+gui}. Inspecting \texttt{+DnButton} directly
+
+
+\begin{wideverbatim}
+: (dep '+DnButton)
+   +Tiny
+   +Rid
+   +JS
+   +Able
+      +gui
+   +Button
++DnButton
+-> +DnButton
+\end{wideverbatim}
+
+shows that \texttt{+DnButton} inherits from \texttt{+Tiny}, \texttt{+Rid}, \texttt{+Able} and
+\texttt{+Button}. The actual definition of \texttt{+DnButton} can be found in
+``@lib/form.l''
+
+
+\begin{wideverbatim}
+(class +DnButton +Tiny +Rid +JS +Able +Button)
+...
+\end{wideverbatim}
+
+In general, ``@lib/form.l'' is the ultimate reference to the framework,
+and should be freely consulted.
+
+ 
+\subsection{Input Fields}
+\label{sec:appl-devel-input-fields}
+
+
+Input fields implement the visual display of application data, and allow
+\begin{itemize}
+\item when enabled - input and modification of these data.
+\end{itemize}
+
+On the HTML level, they can take the form of
+
+\begin{itemize}
+\item Normal text input fields
+\item Textareas
+\item Checkboxes
+\item Drop-down selections
+\item Password fields
+\item HTML links
+\item Plain HTML text
+\end{itemize}
+
+Except for checkboxes, which are implemented by the
+\emph{Checkbox} class, all these HTML representations are
+generated by \texttt{+TextField} and its content-specific subclasses like
+\texttt{+NumField}, \texttt{+DateField} etc. Their actual appearance (as one of the
+above forms) depends on their arguments:
+
+We saw already ``normal'' text fields. They are created with a single
+numeric argument. This example creates an editable field with a width of
+10 characters:
+
+
+\begin{wideverbatim}
+(gui '(+TextField) 10)
+\end{wideverbatim}
+
+If you supply a second numeric for the line count (`4' in this case),
+you'll get a text area:
+
+
+\begin{wideverbatim}
+(gui '(+TextField) 10 4)
+\end{wideverbatim}
+
+Supplying a list of values instead of a count yields a drop-down
+selection (combo box):
+
+
+\begin{wideverbatim}
+(gui '(+TextField) '("Value 1" "Value 2" "Value 3"))
+\end{wideverbatim}
+
+In addition to these arguments, you can pass a string. Then the field is
+created with a label:
+
+
+\begin{wideverbatim}
+(gui '(+TextField) 10 "Plain")
+(gui '(+TextField) 10 4 "Text Area")
+(gui '(+TextField) '("Value 1" "Value 2" "Value 3") "Selection")
+\end{wideverbatim}
+
+Finally, without any arguments, the field will appear as a plain HTML
+text:
+
+
+\begin{wideverbatim}
+(gui '(+TextField))
+\end{wideverbatim}
+
+This makes mainly sense in combination with prefix classes like \texttt{+Var}
+and \texttt{+Obj}, to manage the contents of these fields, and achieve special
+behavior as HTML links or scrollable chart values.
+
+\subsubsection{ Numeric Input Fields}
+\label{sec:appl-devel-numeric-input-fields}%
+
+A \texttt{+NumField} returns a number from its \texttt{val>} method, and accepts a
+number for its \texttt{set>} method. It issues an error message when user input
+cannot be converted to a number.
+
+Large numbers are shown with a thousands-separator, as determined by the
+current locale.
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(action
+   (html 0 "+NumField" "@lib.css" NIL
+      (form NIL
+         (gui '(+NumField) 10)
+         (gui '(+JS +Button) "Print value"
+            '(msg (val> (: home gui 1))) )
+         (gui '(+JS +Button) "Set to 123"
+            '(set> (: home gui 1) 123) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+A \texttt{+FixField} needs an additional scale factor argument, and
+accepts/returns scaled fixpoint numbers.
+
+The decimal separator is determined by the current locale.
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(action
+   (html 0 "+FixField" "@lib.css" NIL
+      (form NIL
+         (gui '(+FixField) 3 10)
+         (gui '(+JS +Button) "Print value"
+            '(msg (format (val> (: home gui 1)) 3)) )
+         (gui '(+JS +Button) "Set to 123.456"
+            '(set> (: home gui 1) 123456) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+\subsubsection{ Time \& Date}
+\label{sec:appl-devel-time-date}%
+
+A \texttt{+DateField} accepts and returns a \texttt{date} value.
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(action
+   (html 0 "+DateField" "@lib.css" NIL
+      (form NIL
+         (gui '(+DateField) 10)
+         (gui '(+JS +Button) "Print value"
+            '(msg (datStr (val> (: home gui 1)))) )
+         (gui '(+JS +Button) "Set to \"today\""
+            '(set> (: home gui 1) (date)) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+The format displayed to - and entered by - the user depends on the
+current locale (see \texttt{datStr} and \texttt{expDat}). You can change it, for
+example to
+
+
+\begin{wideverbatim}
+: (locale "DE" "de")
+-> NIL
+\end{wideverbatim}
+
+If no locale is set, the format is YYYY-MM-DD. Some pre-defined locales
+use patterns like DD.MM.YYYY (DE), YYYY/MM/DD (JP), DD/MM/YYYY (UK), or
+MM/DD/YYYY (US).
+
+An error is issued when user input does not match the current locale's
+date format.
+
+Independent from the locale setting, a \texttt{+DateField} tries to expand
+abbreviated input from the user. A small number is taken as that day of
+the current month, larger numbers expand to day and month, or to day,
+month and year:
+
+\begin{itemize}
+\item ``7'' gives the 7th of the current month
+\item ``031'' or ``0301'' give the 3rd of January of the current year
+\item ``311'' or ``3101'' give the 31st of January of the current year
+\item ``0311'' gives the 3rd of November of the current year
+\item ``01023'' or ``010203'' give the first of February in the year 2003
+\item and so on
+\end{itemize}
+
+Similar is the \texttt{+TimeField}. It accepts and returns a \texttt{time} value.
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(action
+   (html 0 "+TimeField" "@lib.css" NIL
+      (form NIL
+         (gui '(+TimeField) 8)
+         (gui '(+JS +Button) "Print value"
+            '(msg (tim$ (val> (: home gui 1)))) )
+         (gui '(+JS +Button) "Set to \"now\""
+            '(set> (: home gui 1) (time)) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+When the field width is `8', like in this example, time is displayed in
+the format \texttt{HH:MM:SS}. Another possible value would be `5', causing
+\texttt{+TimeField} to display its value as \texttt{HH:MM}.
+
+An error is issued when user input cannot be converted to a time value.
+
+The user may omit the colons. If he inputs just a small number, it
+should be between `0' and `23', and will be taken as a full hour. `125'
+expands to ``12:05'', `124517' to ``12:45:17'', and so on.
+
+\subsubsection{ Telephone Numbers}
+\label{sec:appl-devel-telephone-numbers}%
+
+Telephone numbers are represented internally by the country code
+(without a leading plus sign or zero) followed by the local phone number
+(ideally separated by spaces) and the phone extension (ideally separated
+by a hyphen). The exact format of the phone number string is not
+enforced by the GUI, but further processing (e.g. database searches)
+normally uses \texttt{fold} for better reproducibility.
+
+To display a phone number, \texttt{+TelField} replaces the country code with a
+single zero if it is the country code of the current locale, or prepends
+it with a plus sign if it is a foreign country (see \texttt{telStr}).
+
+For user input, a plus sign or a double zero is simply dropped, while a
+single leading zero is replaced with the current locale's country code
+(see \texttt{expTel}).
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+(locale "DE" "de")
+
+(action
+   (html 0 "+TelField" "@lib.css" NIL
+      (form NIL
+         (gui '(+TelField) 20)
+         (gui '(+JS +Button) "Print value"
+            '(msg (val> (: home gui 1))) )
+         (gui '(+JS +Button) "Set to \"49 1234 5678-0\""
+            '(set> (: home gui 1) "49 1234 5678-0") ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+\subsubsection{ Checkboxes}
+\label{sec:appl-devel-checkboxes}%
+
+A \texttt{+Checkbox} is straightforward. User interaction is restricted to
+clicking it on and off. It accepts boolean (\texttt{NIL} or non \texttt{NIL}  values,
+and returns \texttt{T} or \texttt{NIL}.
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(action
+   (html 0 "+Checkbox" "@lib.css" NIL
+      (form NIL
+         (gui '(+Checkbox))
+         (gui '(+JS +Button) "Print value"
+            '(msg (val> (: home gui 1))) )
+         (gui '(+JS +Button) "On"
+            '(set> (: home gui 1) T) )
+         (gui '(+JS +Button) "Off"
+            '(set> (: home gui 1) NIL) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+
+\subsection{Field Prefix Classes}
+\label{sec:appl-devel-field-prefix-classes}
+
+A big part of this framework's power is owed to the combinatorial
+flexibility of prefix classes for GUI- and DB-objects. They allow to
+surgically override individual methods in the inheritance tree, and can
+be combined in various ways to achieve any desired behavior.
+
+Technically, there is nothing special about prefix classes. They are
+just normal classes. They are called ``prefix'' because they are intended
+to be written \emph{before} other classes in a class's or object's list of
+superclasses.
+
+Usually they take their own arguments for their \texttt{T} method from the list
+of arguments to the \texttt{gui} function.
+
+
+\subsubsection{ Initialization}
+\label{sec:appl-devel-initialization}%
+
+\texttt{+Init} overrides the \texttt{init>} method for that component. The \texttt{init>}
+message is sent to a \texttt{+gui} component when the page is loaded for the
+first time (during a GET request). \texttt{+Init} takes an expression for the
+initial value of that field.
+
+
+\begin{wideverbatim}
+(gui '(+Init +TextField) "This is the initial text" 30)
+\end{wideverbatim}
+
+Other classes which automatically give a value to a field are \texttt{+Var}
+(linking the field to a variable) and \texttt{+E/R} (linking the field to a
+database entity/relation).
+
+\texttt{+Cue} can be used, for example in ``mandatory'' fields, to give a hint to
+the user about what he is supposed to enter. It will display the
+argument value, in angular brackets, if and only if the field's value is
+\texttt{NIL}, and the \texttt{val>} method will return \texttt{NIL} despite the fact that
+this value is displayed.
+
+Cause an empty field to display ``\textless Please enter some text
+here\textgreater '':
+
+
+\begin{wideverbatim}
+(gui '(+Cue +TextField) "Please enter some text here" 30)
+\end{wideverbatim}
+
+
+\subsubsection{ Disabling and Enabling}
+\label{sec:appl-devel-disabling-and-enabling}%
+An important feature of an interactive GUI is the context-sensitive
+disabling and enabling of individual components, or of a whole form.
+
+The \texttt{+Able} prefix class takes an argument expression, and disables the
+component if this expression returns \texttt{NIL}. We saw an example for its
+usage already in the \emph{square root button} of the
+calculator example. Or, for illustration purposes, imagine a button
+which is supposed to be enabled only after Christmas
+
+
+\begin{wideverbatim}
+(gui '(+Able +Button)
+   '(>= (cdr (date (date))) (12 24))
+   "Close this year"
+   '(endOfYearProcessing) )
+\end{wideverbatim}
+
+or a password field that is disabled as long as somebody is logged in
+
+
+\begin{wideverbatim}
+(gui '(+Able +PwField) '(not *Login) 10 "Password")
+\end{wideverbatim}
+
+A special case is the \texttt{+Lock} prefix, which permanently and
+unconditionally disables a component. It takes no arguments
+
+
+\begin{wideverbatim}
+(gui '(+Lock +NumField) 10 "Count")
+\end{wideverbatim}
+
+(`10' and ``Count'' are for the \texttt{+NumField}), and creates a read-only
+field.
+
+The whole form can be disabled by calling \texttt{disable} with a non
+\texttt{NIL} argument. This affects all components in this form.
+Staying with the above example, we can make the form read-only until
+Christmas
+
+
+\begin{wideverbatim}
+(form NIL
+   (disable (> (12 24) (cdr (date (date)))))  # Disable whole form
+   (gui ..)
+   .. )
+\end{wideverbatim}
+
+Even in a completely disabled form, however, it is often necessary to
+re-enable certain components, as they are needed for navigation,
+scrolling, or other activities which don't affect the contents of the
+form. This is done by prefixing these fields with \texttt{+Rid} (i.e. getting
+``rid'' of the lock).
+
+
+\begin{wideverbatim}
+(form NIL
+   (disable (> (12 24) (cdr (date (date)))))
+   (gui ..)
+   ..
+   (gui '(+Rid +Button) ..)  # Button is enabled despite the disabled form
+   .. )
+\end{wideverbatim}
+
+
+\subsubsection{ Formatting}
+\label{sec:appl-devel-formatting}%
+
+GUI prefix classes allow a fine-grained control of how values are stored
+in - and retrieved from - components. As in predefined classes like
+\texttt{+NumField} or \texttt{+DateField}, they override the \texttt{set>} and/or \texttt{val>}
+methods.
+
+\texttt{+Set} takes an argument function which is called whenever that field is
+set to some value. To convert all user input to upper case
+
+
+\begin{wideverbatim}
+(gui '(+Set +TextField) uppc 30)
+\end{wideverbatim}
+
+\texttt{+Val} is the complement to \texttt{+Set}. It takes a function which is called
+whenever the field's value is retrieved. To return the square of a
+field's value
+
+
+\begin{wideverbatim}
+(gui '(+Val +NumField) '((N) (* N N)) 10)
+\end{wideverbatim}
+
+\texttt{+Fmt} is just a combination of \texttt{+Set} and \texttt{+Val}, and takes two
+functional arguments. This example will display upper case characters,
+while returning lower case characters internally
+
+
+\begin{wideverbatim}
+(gui '(+Fmt +TextField) uppc lowc 30)
+\end{wideverbatim}
+
+\texttt{+Map} does (like \texttt{+Fmt}) a two-way translation. It uses a list of cons
+pairs for a linear lookup, where the CARs represent the displayed values
+which are internally mapped to the values in the CDRs. If a value is not
+found in this list during \texttt{set>} or \texttt{val>}, it is passed through
+unchanged.
+
+Normally, \texttt{+Map} is used in combination with the combo box incarnation
+of text fields (see \emph{Input Fields}). This example
+displays ``One'', ``Two'' and ``Three'' to the user, but returns a number 1, 2
+or 3 internally
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(action
+   (html 0 "+Map" "@lib.css" NIL
+      (form NIL
+         (gui '(+Map +TextField)
+            '(("One" . 1) ("Two" . 2) ("Three" . 3))
+            '("One" "Two" "Three") )
+         (gui '(+Button) "Print"
+            '(msg (val> (field -1))) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+
+\subsubsection{ Side Effects}
+\label{sec:appl-devel-side-effects}%
+
+Whenever a button is pressed in the GUI, any changes caused by \texttt{action}
+in the current environment (e.g. the database or application state) need
+to be reflected in the corresponding GUI fields. For that, the \texttt{upd>}
+message is sent to all components. Each component then takes appropriate
+measures (e.g. refresh from database objects, load values from
+variables, or calculate a new value) to update its value.
+
+While the \texttt{upd>} method is mainly used internally, it can be overridden
+in existing classes via the \texttt{+Upd} prefix class. Let's print updated
+values to standard error
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+(default *Number 0)
+
+(action
+   (html 0 "+Upd" "@lib.css" NIL
+      (form NIL
+         (gui '(+Upd +Var +NumField)
+            '(prog (extra) (msg *Number))
+            '*Number 8 )
+         (gui '(+JS +Button) "Increment"
+            '(inc '*Number) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+\subsubsection{ Validation}
+\label{sec:appl-devel-validation}%
+
+To allow automatic validation of user input, the \texttt{chk>} message is sent
+to all components at appropriate times. The corresponding method should
+return \texttt{NIL} if the value is all right, or a string describing the error
+otherwise.
+
+Many of the built-in classes have a \texttt{chk>} method. The \texttt{+NumField} class
+checks for legal numeric input, or the \texttt{+DateField} for a valid calendar
+date.
+
+An on-the-fly check can be implemented with the \texttt{+Chk} prefix class. The
+following code only accepts numbers not bigger than 9: The \texttt{or}
+expression first delegates the check to the main \texttt{+NumField} class, and
+\begin{itemize}
+\item if it does not give an error - returns an error string when the
+\end{itemize}
+current value is greater than 9.
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(action
+   (html 0 "+Chk" "@lib.css" NIL
+      (form NIL
+         (gui '(+Chk +NumField)
+            '(or
+               (extra)
+               (and (> (val> This) 9) "Number too big") )
+            12 )
+         (gui '(+JS +Button) "Print"
+            '(msg (val> (field -1))) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+A more direct kind of validation is built-in via the \texttt{+Limit} class. It
+controls the \texttt{maxlength} attribute of the generated HTML input field
+component. Thus, it is impossible to type to more characters than
+allowed into the field.
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(action
+   (html 0 "+Limit" "@lib.css" NIL
+      (form NIL
+         (gui '(+Limit +TextField) 4 8)
+         (gui '(+JS +Button) "Print"
+            '(msg (val> (field -1))) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+ 
+
+
+\subsubsection{ Data Linkage}
+\label{sec:appl-devel-data-linkage}%
+
+Although \texttt{set>} and \texttt{val>} are the official methods to get a value in
+and out of a GUI component, they are not very often used explicitly.
+Instead, components are directly linked to internal Lisp data
+structures, which are usually either variables or database objects.
+
+The \texttt{+Var} prefix class takes a variable (described as the \texttt{var} data
+type - either a symbol or a cell - in the \emph{Function Reference}). In the following example, we initialize a global variable
+with the value ``abc'', and let a \texttt{+TextField} operate on it. The ``Print''
+button can be used to display its current value.
+
+
+\begin{wideverbatim}
+########################################################################
+(app)
+
+(setq *TextVariable "abc")
+
+(action
+   (html 0 "+Var" "@lib.css" NIL
+      (form NIL
+         (gui '(+Var +TextField) '*TextVariable 8)
+         (gui '(+JS +Button) "Print"
+            '(msg *TextVariable) ) ) ) )
+########################################################################
+\end{wideverbatim}
+
+\texttt{+E/R} takes an entity/relation specification. This is a cell, with a
+relation in its CAR (e.g. \texttt{nm}, for an object's name), and an expression
+in its CDR (typically \texttt{(: home obj)}, the object stored in the \texttt{obj}
+property of the current form).
+
+For an isolated, simple example, we create a temporary database, and
+access the \texttt{nr} and \texttt{nm} properties of an object stored in a global
+variable \texttt{*Obj}.
+
+
+\begin{wideverbatim}
+########################################################################
+(when (app)                # On start of session
+   (class +Tst +Entity)    # Define data model
+   (rel nr (+Number))      # with a number
+   (rel nm (+String))      # and a string
+   (pool (tmp "db"))       # Create temporary DB
+   (setq *Obj              # and a single object
+      (new! '(+Tst) 'nr 1 'nm "New Object") ) )
+
+(action
+   (html 0 "+E/R" "@lib.css" NIL
+      (form NIL
+         (gui '(+E/R +NumField) '(nr . *Obj) 8)    # Linkage to 'nr'
+         (gui '(+E/R +TextField) '(nm . *Obj) 20)  # Linkage to 'nm'
+         (gui '(+JS +Button) "Show"                # Show the object
+            '(out 2 (show *Obj)) ) ) ) )           # on standard error
+########################################################################
+\end{wideverbatim}
+
+
+\subsection{Buttons}
+\label{sec:appl-devel-buttons}
+
+
+Buttons are, as explained in \emph{Control Flow}, the only way
+(via POST requests) for an application to communicate with the server.
+
+Basically, a \texttt{+Button} takes
+
+\begin{itemize}
+\item a label, which may be either a string or the name of an image file
+\item an optional alternative label, shown when the button is disabled
+\item and an executable expression.
+\end{itemize}
+
+Here is a minimal button, with just a label and an expression:
+
+
+\begin{wideverbatim}
+(gui '(+Button) "Label" '(doSomething))
+\end{wideverbatim}
+
+And this is a button displaying different labels, depending on the
+state:
+
+
+\begin{wideverbatim}
+(gui '(+Button) "Enabled" "Disabled" '(doSomething))
+\end{wideverbatim}
+
+To show an image instead of plain text, the label(s) must be preceeded
+by the \texttt{T} symbol:
+
+
+\begin{wideverbatim}
+(gui '(+Button) T "img/enabled.png" "img/disabled.png" '(doSomething))
+\end{wideverbatim}
+
+The expression will be executed during \texttt{action} handling (see
+\emph{Action Forms}), when this button was pressed.
+
+Like other components, buttons can be extended and combined with prefix
+classes, and a variety of predefined classes and class combinations are
+available.
+
+
+\subsubsection{ Dialog Buttons}
+\label{sec:appl-devel-dialog-buttons}%
+
+Buttons are essential for the handling of \emph{alerts and dialogs}. Besides buttons for normal functions, like
+\emph{scrolling} in charts or other \emph{side effects}, special buttons exist which can \emph{close} an alert or dialog in
+addition to doing their principal job.
+
+Such buttons are usually subclasses of \texttt{+Close}, and most of them can be
+called easily with ready-made functions like \texttt{closeButton},
+\texttt{cancelButton}, \texttt{yesButton} or \texttt{noButton}. We saw a few examples in
+\emph{Alerts and Dialogs}.
+
+ 
+
+
+\subsubsection{ Active JavaScript}
+\label{sec:appl-devel-active-javascript}%
+
+When a button inherits from the \texttt{+JS} class (and JavaScript is enabled
+in the browser), that button will possibly show a much faster response
+in its action.
+
+The reason is that the activation of a \texttt{+JS} button will - instead of
+doing a normal POST - first try to send only the contents of all GUI
+components via an XMLHttpRequest to the server, and receive the updated
+values in response. This avoids the flicker caused by reloading and
+rendering of the whole page, is much faster, and also does not jump to
+the beginning of the page if it is larger than the browser window. The
+effect is especially noticeable while scrolling in charts.
+
+Only if this fails, for example because an error message was issued, or
+a dialog popped up, it will fall back, and the form will be POSTed in
+the normal way.
+
+Thus it makes no sense to use the \texttt{+JS} prefix for buttons that cause a
+change of the HTML code, open a dialog, or jump to another page. In such
+cases, overall performance will even be worse, because the
+XMLHttpRequest is tried first (but in vain).
+
+When JavaScript is disabled int the browser, the XMLHttpRequest will not
+be tried at all. The form will be fully usable, though, with identical
+functionality and behavior, just a bit slower and not so smooth.
+
+\section{A Minimal Complete Application}
+\label{sec:appl-devel-a-minimal-complete-application}
+
+The PicoLisp release includes in the ``app/'' directory a minimal, yet
+complete reference application. This application is typical, in the
+sense that it implements many of the techniques described in this
+document, and it can be easily modified and extended. In fact, we use it
+as templates for our own production application development.
+
+It is a kind of simplified ERP system, containing customers/suppliers,
+products (items), orders, and other data. The order input form performs
+live updates of customer and product selections, price, inventory and
+totals calculations, and generates on-the-fly PDF documents.
+Fine-grained access permissions are controlled via users, roles and
+permissions. It comes localized in six languages (English, Spanish,
+German, Norwegian, Russian and Japanese), with some initial data and two
+sample reports.
+
+ 
+\subsection{Getting Started}
+\label{sec:appl-devel-getting-started}
+
+For a global installation (see \emph{Installation}), please
+create a symbolic link to the place where the program files are
+installed. This is necessary because the application needs read/write
+access to the current working directory (for the database and other
+runtime data).
+
+\begin{wideverbatim}
+$ ln -s /usr/share/picolisp/app
+\end{wideverbatim}
+
+As ever, you may start up the application in debugging mode
+
+
+\begin{wideverbatim}
+$ pil app/main.l -main -go +
+\end{wideverbatim}
+
+or in (non-debug) production mode
+
+
+\begin{wideverbatim}
+$ pil app/main.l -main -go -wait
+\end{wideverbatim}
+
+and go to `\texttt{http://localhost:8080}' with your browser. You can login as
+user ``admin'', with password ``admin''. The demo data contain several other
+users, but those are more restricted in their role permissions.
+
+Another possibility is to try the online version of this application at
+\href{http://app.7fach.de}{app.7fach.de}.
+
+ 
+\subsubsection{ Localization}
+\label{sec:appl-devel-localization}%
+
+
+Before or after you logged in, you can select another language, and
+click on the ``Change'' button. This will effect all GUI components
+(though not text from the database), and also the numeric, date and
+telephone number formats.
+
+\subsubsection{ Navigation}
+\label{sec:appl-devel-navigation}%
+The navigation menu on the left side shows two items ``Home'' and
+``logout'', and three submenus ``Data'', ``Report'' and ``System''.
+
+Both ``Home'' and ``logout'' bring you back to the initial login form. Use
+``logout'' if you want to switch to another user (say, for another set of
+permissions), and - more important - before you close your browser, to
+release possible locks and process resources on the server.
+
+The ``Data'' submenu gives access to application specific data entry and
+maintenance: Orders, product items, customers and suppliers. The
+``Report'' submenu contains two simple inventory and sales reports. And
+the ``System'' submenu leads to role and user administration.
+
+You can open and close each submenu individually. Keeping more than one
+submenu open at a time lets you switch rapidly between different parts
+of the application.
+
+The currently active menu item is indicated by a highlighted list style
+(no matter whether you arrived at this page directly via the menu or by
+clicking on a link somewhere else).
+
+ 
+\subsubsection{ Choosing Objects}
+\label{sec:appl-devel-choosing-objects}%
+
+Each item in the ``Data'' or ``System'' submenu opens a search dialog for
+that class of entities. You can specify a search pattern, press the top
+right ``Search'' button (or just ENTER), and scroll through the list of
+results.
+
+While the ``Role'' and ``User'' entities present simple dialogs (searching
+just by name), other entities can be searched by a variety of criteria.
+In those cases, a ``Reset'' button clears the contents of the whole
+dialog. A new object can be created with bottom right ``New'' button.
+
+In any case, the first column will contain either a ``@''-link (to jump to
+that object) or a ``@''-button (to insert a reference to that object into
+the current form).
+
+By default, the search will list all database objects with an attribute
+value greater than or equal to the search criterion. The comparison is
+done arithmetically for numbers, and alphabetically (case sensitive!)
+for text. This means, if you type ``Free'' in the ``City'' field of the
+``Customer/Supplier'' dialog, the value of ``Freetown'' will be matched. On
+the other hand, an entry of ``free'' or ``town'' will yield no hits.
+
+Some search fields, however, show a different behavior depending on the
+application:
+
+\begin{itemize}
+\item The names of persons, companies or products allow a tolerant search,
+   matching either a slightly misspelled name (``Mühler'' instead of
+   ``Miller'') or a substring (``Oaks'' will match ``Seven Oaks Ltd.'').
+\item The search field may specify an upper instead of a lower limit,
+   resulting in a search for database objects with an attribute value
+   less than or equal to the search criterion. This is useful, for
+   example in the ``Order'' dialog, to list orders according to their
+   number or date, by starting with the newest then and going backwards.
+\end{itemize}
+
+Using the bottom left scroll buttons, you can scroll through the result
+list without limit. Clicking on a link will bring up the corresponding
+object. Be careful here to select the right column: Some dialogs (those
+for ``Item'' and ``Order'') also provide links for related entities (e.g.
+``Supplier'').
+
+\subsubsection{ Editing}
+\label{sec:appl-devel-editing}%
+
+A database object is usually displayed in its own individual form, which
+is determined by its entity class.
+
+The basic layout should be consistent for all classes: Below the heading
+(which is usually the same as the invoking menu item) is the object's
+identifier (name, number, etc.), and then a row with an ``Edit'' button on
+the left, and ``Delete'' button, a ``Select'' button and two navigation
+links on the right side.
+
+The form is brought up initially in read-only mode. This is necessary to
+prevent more than one user from modifying an object at the same time
+(and contrary to the previous PicoLisp Java frameworks, where this was
+not a problem because all changes were immediately reflected in the GUIs
+of other users).
+
+So if you want to modify an object, you have to gain exclusive access by
+clicking on the ``Edit'' button. The form will be enabled, and the ``Edit''
+button changes to ``Done''. Should any other user already have reserved
+this object, you will see a message telling his name and process ID.
+
+An exception to this are objects that were just created with ``New''. They
+will automatically be reserved for you, and the ``Edit'' button will show
+up as ``Done''.
+
+The ``Delete'' button pops up an alert, asking for confirmation. If the
+object is indeed deleted, this button changes to ``Restore'' and allows to
+undelete the object. Note that objects are never completely deleted from
+the database as long as there are any references from other objects.
+When a ``deleted'' object is shown, its identifier appears in square
+brackets.
+
+The ``Select'' button (re-)displays the search dialog for this class of
+entities. The search criteria are preserved between invocations of each
+dialog, so that you can conveniently browse objects in this context.
+
+The navigation links, pointing left and right, serve a similar purpose.
+They let you step sequentially through all objects of this class, in the
+order of the identifier's index.
+
+Other buttons, depending on the entity, are usually arranged at the
+bottom of the form. The bottom rightmost one should always be another
+``Edit'' / ``Done'' button.
+
+As we said in the chapter on \emph{Scrolling}, any button in
+the form will save changes to the underlying data model. As a special
+case, however, the ``Done'' button releases the object and reverts to
+``Edit''. Besides this, the edit mode will also cease as soon as another
+object is displayed, be it by clicking on an object link (the pencil
+icon), the top right navigation links, or a link in a search dialog.
+
+
+\subsubsection{ Buttons vs. Links}
+\label{sec:appl-devel-buttons-vs.-links}%
+
+The only way to interact with a HTTP-based application server is to
+click either on a HTML link, or on a submit button (see also
+\emph{Control Flow}). It is essential to understand the different
+effects of such a click on data entered or modified in the current form.
+
+\begin{itemize}
+\item A click on a link will leave or reload the page. Changes are
+   discarded.
+\item A click on a button will commit changes, and perform the associated
+   action.
+\end{itemize}
+
+For that reason the layout design should clearly differentiate between
+links and buttons. Image buttons are not a good idea when in other
+places images are used for links. The standard button components should
+be preferred; they are usually rendered by the browser in a
+non-ambiguous three-dimensional look and feel.
+
+Note that if JavaScript is enabled in the browser, changes will be
+automatically committed to the server.
+
+The enabled or disabled state of a button is an integral part of the
+application logic. It must be indicated to the user with appropriate
+styles.
+
+\subsection{The Data Model}
+\label{sec:appl-devel-the-data-model}
+
+\paragraph{Source Code}
+\label{sec:appl-devel-data-model-source-code}
+
+\begin{wideverbatim}
+
+# 21jul11abu
+# (c) Software Lab. Alexander Burger
+
+### Entity/Relations ###
+#
+#           nr    nm                   nr    nm               nm
+#            |    |                     |    |                |
+#          +-*----*-+                 +-*----*-+           +--*-----+
+#          |        |             sup |        |           |        |
+#    str --*  CuSu  O-----------------*  Item  *-- inv     |  Role  @-- perm
+#          |        |                 |        |           |        |
+#          +-*-*--O-+                 +----O---+           +----@---+
+#            | |  |                        |                    | usr
+#   nm  tel -+ |  |                        |                    |
+#    |         |  |                        | itm                | role
+#  +-*-----+   |  |   +-------+        +---*---+           +----*---+
+#  |       |   |  |   |       |    ord |       |           |        |
+#  |  Sal  +---+  +---*  Ord  @--------*  Pos  |      nm --*  User  *-- pw
+#  |       |      cus |       | pos    |       |           |        |
+#  +-*---*-+          +-*---*-+        +-*---*-+           +--------+
+#    |   |              |   |            |   |
+#   hi   sex           nr  dat          pr   cnt
+
+
+(extend +Role)
+
+(dm url> (Tab)
+   (and (may RoleAdmin) (list "app/role.l" '*ID This)) )
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+(extend +User)
+(rel nam (+String))                    # Full Name
+(rel tel (+String))                    # Phone
+(rel em (+String))                     # EMail
+
+(dm url> (Tab)
+   (and (may UserAdmin) (list "app/user.l" '*ID This)) )
+
+
+# Salutation
+(class +Sal +Entity)
+(rel nm (+Key +String))                # Salutation
+(rel hi (+String))                     # Greeting
+(rel sex (+Any))                       # T:male, 0:female
+
+(dm url> (Tab)
+   (and (may Customer) (list "app/sal.l" '*ID This)) )
+
+(dm hi> (Nm)
+   (or (text (: hi) Nm) ,"Dear Sir or Madam,") )
+
+
+# Customer/Supplier
+(class +CuSu +Entity)
+(rel nr (+Need +Key +Number))          # Customer/Supplier Number
+(rel sal (+Link) (+Sal))               # Salutation
+(rel nm (+Sn +Idx +String))            # Name
+(rel nm2 (+String))                    # Name 2
+(rel str (+String))                    # Street
+(rel plz (+Ref +String))               # Zip
+(rel ort (+Fold +Idx +String))         # City
+(rel tel (+Fold +Ref +String))         # Phone
+(rel fax (+String))                    # Fax
+(rel mob (+Fold +Ref +String))         # Mobile
+(rel em (+String))                     # EMail
+(rel txt (+Blob))                      # Memo
+
+(dm url> (Tab)
+   (and (may Customer) (list "app/cusu.l"  '*Tab Tab  '*ID This)) )
+
+(dm check> ()
+   (make
+      (or (: nr) (link ,"No customer number"))
+      (or (: nm) (link ,"No customer name"))
+      (unless (and (: str) (: plz) (: ort))
+         (link ,"Incomplete customer address") ) ) )
+
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+# Item
+(class +Item +Entity)
+(rel nr (+Need +Key +Number))          # Item Number
+(rel nm (+Fold +Idx +String))          # Item Description
+(rel sup (+Ref +Link) NIL (+CuSu))     # Supplier
+(rel inv (+Number))                    # Inventory
+(rel pr (+Ref +Number) NIL 2)          # Price
+(rel txt (+Blob))                      # Memo
+(rel jpg (+Blob))                      # Picture
+
+(dm url> (Tab)
+   (and (may Item) (list "app/item.l" '*ID This)) )
+
+(dm cnt> ()
+   (-
+      (or (: inv) 0)
+      (sum '((This) (: cnt))
+         (collect 'itm '+Pos This) ) ) )
+
+(dm check> ()
+   (make
+      (or (: nr) (link ,"No item number"))
+      (or (: nm) (link ,"No item description")) ) )
+
+
+# Order
+(class +Ord +Entity)
+(rel nr (+Need +Key +Number))          # Order Number
+(rel dat (+Need +Ref +Date))           # Order date
+(rel cus (+Ref +Link) NIL (+CuSu))     # Customer
+(rel pos (+List +Joint) ord (+Pos))    # Positions
+
+(dm lose> ()
+   (mapc 'lose> (: pos))
+   (super) )
+
+(dm url> (Tab)
+   (and (may Order) (list "app/ord.l" '*ID This)) )
+
+(dm sum> ()
+   (sum 'sum> (: pos)) )
+
+(dm check> ()
+   (make
+      (or (: nr) (link ,"No order number"))
+      (or (: dat) (link ,"No order date"))
+      (if (: cus)
+         (chain (check> @))
+         (link ,"No customer") )
+      (if (: pos)
+         (chain (mapcan 'check> @))
+         (link ,"No positions") ) ) )
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+(class +Pos +Entity)
+(rel ord (+Dep +Joint)                 # Order
+   (itm)
+   pos (+Ord) )
+(rel itm (+Ref +Link) NIL (+Item))     # Item
+(rel pr (+Number) 2)                   # Price
+(rel cnt (+Number))                    # Quantity
+
+(dm sum> ()
+   (* (: pr) (: cnt)) )
+
+(dm check> ()
+   (make
+      (if (: itm)
+         (chain (check> @))
+         (link ,"Position without item") )
+      (or (: pr) (link ,"Position without price"))
+      (or (: cnt) (link ,"Position without quantity")) ) )
+
+
+# Database sizes
+(dbs
+   (3 +Role +User +Sal)                         # 512 Prevalent objects
+   (0 +Pos)                                     # A:64 Tiny objects
+   (1 +Item +Ord)                               # B:128 Small objects
+   (2 +CuSu)                                    # C:256 Normal objects
+   (2 (+Role nm) (+User nm) (+Sal nm))          # D:256 Small indexes
+   (4 (+CuSu nr plz tel mob))                   # E:1024 Normal indexes
+   (4 (+CuSu nm))                               # F:1024
+   (4 (+CuSu ort))                              # G:1024
+   (4 (+Item nr sup pr))                        # H:1024
+   (4 (+Item nm))                               # I:1024
+   (4 (+Ord nr dat cus))                        # J:1024
+   (4 (+Pos itm)) )                             # K:1024
+
+# vi:et:ts=3:sw=3
+
+
+\end{wideverbatim}
+
+
+\paragraph{Discussion}
+\label{sec:appl-devel-data-model-discussion}
+
+
+The data model for this mini application consists of only six entity
+classes (see the E/R diagram at the beginning of ``app/er.l''):
+
+\begin{itemize}
+\item The three main entities are \texttt{+CuSu} (Customer/Supplier), \texttt{+Item}
+   (Product Item) and \texttt{+Ord} (Order).
+\item A \texttt{+Pos} object is a single position in an order.
+\item \texttt{+Role} and \texttt{+User} objects are needed for authentication and
+   authorization.
+\end{itemize}
+
+The classes \texttt{+Role} and \texttt{+User} are defined in ``@lib/adm.l''. A \texttt{+Role}
+has a name, a list of permissions, and a list of users assigned to this
+role. A \texttt{+User} has a name, a password and a role.
+
+In ``app/er.l'', the \texttt{+Role} class is extended to define an \texttt{url>} method
+for it. Any object whose class has such a method is able to display
+itself in the GUI. In this case, the file ``app/role.l'' will be loaded -
+with the global variable \texttt{*ID} pointing to it - whenever an HTML link to
+this role object is activated.
+
+The \texttt{+User} class is also extended. In addition to the login name, a
+full name, telephone number and email address is declared. And, of
+course, the ubiquitous \texttt{url>} method.
+
+The application logic is centered around orders. An order has a number,
+a date, a customer (an instance of \texttt{+CuSu}) and a list of positions
+(\texttt{+Pos} objects). The \texttt{sum>} method calculates the total amount of this
+order.
+
+Each position has an \texttt{+Item} object, a price and a quantity. The price
+in the position overrides the default price from the item.
+
+Each item has a number, a description, a supplier (also an instance of
+\texttt{+CuSu}), an inventory count (the number of these items that were
+counted at the last inventory taking), and a price. The \texttt{cnt>} method
+calculates the current stock of this item as the difference of the
+inventory and the sold item counts.
+
+The call to \texttt{dbs} at the end of ``app/er.l'' configures the physical
+database storage. Each of the supplied lists has a number in its CAR
+which determines the block size as (64 << N) of the corresponding
+database file. The CDR says that the instances of this class (if the
+element is a class symbol) or the tree nodes (if the element is a list
+of a class symbol and a property name) are to be placed into that file.
+This allows for some optimizations in the database layout.
+
+ 
+\subsection{Usage}
+\label{sec:appl-devel-usage}
+
+When you are connected to the application (see \emph{Getting Started})
+you might try to do some ``real'' work with it. Via the ``Data'' menu
+(see \emph{Navigation}) you can create or modify customers, suppliers,
+items and orders, and produce simple overviews via the ``Report''
+menu.
+ 
+
+\subsubsection{ Customer/Supplier}
+\label{sec:appl-devel-customer/supplier}%
+
+\paragraph{Source Code}
+\label{sec:appl-devel-customer/supplier-source-code}
+
+\begin{wideverbatim}
+
+# 05nov09abu
+# (c) Software Lab. Alexander Burger
+
+(must "Customer/Supplier" Customer)
+
+(menu ,"Customer/Supplier"
+   (ifn *ID
+      (prog
+         (<h3> NIL ,"Select" " " ,"Customer/Supplier")
+         (form 'dialog (choCuSu)) )
+      (<h3> NIL ,"Customer/Supplier")
+      (form NIL
+         (<h2> NIL (<id> (: nr) " -- " (: nm)))
+         (panel T (pack ,"Customer/Supplier" " @1") '(may Delete) '(choCuSu) 'nr '+CuSu)
+         (<hr>)
+         (<tab>
+            (,"Name"
+               (<grid> 3
+                  ,"Number" NIL (gui '(+E/R +NumField) '(nr : home obj) 10)
+                  ,"Salutation"
+                  (gui '(+Hint) ,"Salutation"
+                     '(mapcar '((This) (cons (: nm) This)) (collect 'nm '+Sal)) )
+                  (gui '(+Hint2 +E/R +Obj +TextField) '(sal : home obj) '(nm +Sal) 20)
+                  ,"Name" NIL (gui '(+E/R +Cue +TextField) '(nm : home obj) ,"Name" 40)
+                  ,"Name 2" NIL (gui '(+E/R +TextField) '(nm2 : home obj) 40) ) )
+            (,"Address"
+               (<grid> 2
+                  ,"Street" (gui '(+E/R +TextField) '(str : home obj) 40)
+                  NIL NIL
+                  ,"Zip" (gui '(+E/R +TextField) '(plz : home obj) 10)
+                  ,"City" (gui '(+E/R +TextField) '(ort : home obj) 40) ) )
+            (,"Contact"
+               (<grid> 2
+                  ,"Phone" (gui '(+E/R +TelField) '(tel : home obj) 40)
+                  ,"Fax" (gui '(+E/R +TelField) '(fax : home obj) 40)
+                  ,"Mobile" (gui '(+E/R +TelField) '(mob : home obj) 40)
+                  ,"EMail" (gui '(+E/R +MailField) '(em : home obj) 40) ) )
+            ((pack (and (: obj txt) "@ ") ,"Memo")
+               (gui '(+BlobField) '(txt : home obj) 60 8) ) )
+         (<hr>)
+         (<spread> NIL (editButton T)) ) ) )
+
+# vi:et:ts=3:sw=3
+
+\end{wideverbatim}
+
+
+\paragraph{Discussion}
+\label{sec:appl-devel-customer/supplier-discussion}
+
+The Customer/Supplier search dialog (\texttt{choCuSu} in ``app/gui.l'') supports
+a lot of search criteria. These become necessary when the database
+contains a large number of customers, and can filter by zip, by phone
+number prefixes, and so on.
+
+In addition to the basic layout (see \emph{Editing}), the form is
+divided into four separate tabs. Splitting a form into several tabs
+helps to reduce traffic, with possibly better GUI response. In this
+case, four tabs are perhaps overkill, but ok for demonstration purposes,
+and they leave room for extensions.
+
+Be aware that when data were modified in one of the tabs, the ``Done''
+button has to be pressed before another tab is clicked, because tabs are
+implemented as HTML links (see \emph{Buttons vs. Links}).
+
+New customers or suppliers will automatically be assigned the next free
+number. You can enter another number, but an error will result if you
+try to use an existing number. The ``Name'' field is mandatory, you need
+to overwrite the ``<Name>'' clue.
+
+Phone and fax numbers in the ``Contact'' tab must be entered in the
+correct format, depending on the locale (see \emph{Telephone Numbers}).
+
+The ``Memo'' tab contains a single text area. It is no problem to use it
+for large pieces of text, as it gets stored in a database blob
+internally.
+
+
+\subsubsection{ Item}
+\label{sec:appl-devel-item}%
+
+
+\paragraph{Source Code}
+\label{sec:appl-devel-item-source-code}
+
+\begin{wideverbatim}
+
+# 09aug10abu
+# (c) Software Lab. Alexander Burger
+
+(must "Item" Item)
+
+(menu ,"Item"
+   (ifn *ID
+      (prog
+         (<h3> NIL ,"Select" " " ,"Item")
+         (form 'dialog (choItem)) )
+      (<h3> NIL ,"Item")
+      (form NIL
+         (<h2> NIL (<id> (: nr) " -- " (: nm)))
+         (panel T (pack ,"Item" " @1") '(may Delete) '(choItem) 'nr '+Item)
+         (<grid> 4
+            ,"Number" NIL (gui '(+E/R +NumField) '(nr : home obj) 10) NIL
+            ,"Description" NIL (gui '(+E/R +Cue +TextField) '(nm : home obj) ,"Item" 30) NIL
+            ,"Supplier" (gui '(+ChoButton) '(choCuSu (field 1)))
+            (gui '(+E/R +Obj +TextField) '(sup : home obj) '(nm +CuSu) 30)
+            (gui '(+View +TextField) '(field -1 'obj 'ort) 30)
+            ,"Inventory" NIL (gui '(+E/R +NumField) '(inv : home obj) 12)
+            (gui '(+View +NumField) '(cnt> (: home obj)) 12)
+            ,"Price" NIL (gui '(+E/R +FixField) '(pr : home obj) 2 12) )
+         (--)
+         (<grid> 2
+            ,"Memo" (gui '(+BlobField) '(txt : home obj) 60 8)
+            ,"Picture"
+            (prog
+               (gui '(+Able +UpField) '(not (: home obj jpg)) 30)
+               (gui '(+Drop +Button) '(field -1)
+                  '(if (: home obj jpg) ,"Uninstall" ,"Install")
+                  '(cond
+                     ((: home obj jpg)
+                        (ask ,"Uninstall Picture?"
+                           (put!> (: home top 1 obj) 'jpg NIL) ) )
+                     ((: drop) (blob! (: home obj) 'jpg @)) ) ) ) )
+         (<spread> NIL (editButton T))
+         (gui '(+Img)
+            '(and (: home obj jpg) (allow (blob (: home obj) 'jpg)))
+            ,"Picture") ) ) )
+
+# vi:et:ts=3:sw=3
+
+
+\end{wideverbatim}
+
+\paragraph{Discussion}
+\label{sec:appl-devel-data-model-discussion}
+
+Items also have a unique number, and a mandatory ``Description'' field.
+
+To assign a supplier, click on the ``+'' button. The Customer/Supplier
+search dialog will appear, and you can pick the desired supplier with
+the ``@'' button in the first column. Alternatively, if you are sure to
+know the exact spelling of the supplier's name, you can also enter it
+directly into the text field.
+
+In the search dialog you may also click on a link, for example to
+inspect a possible supplier, and then return to the search dialog with
+the browser's back button. The ``Edit'' mode will then be lost, however,
+as another object has been visited (this is described in the last part
+of \emph{Editing}).
+
+You can enter an inventory count, the number of items currently in
+stock. The following field will automatically reflect the remaining
+pieces after some of these items were sold (i.e. referenced in order
+positions). It cannot be changed manually.
+
+The price should be entered with the decimal separator according to the
+current locale. It will be formatted with two places after the decimal
+separator.
+
+The ``Memo'' is for an arbitrary info text, like in
+\emph{Customer/Supplier} above, stored in a database blob.
+
+Finally, a JPEG picture can be stored in a blob for this item. Choose a
+file with the browser's file select control, and click on the ``Install''
+button. The picture will appear at the bottom of the page, and the
+``Install'' button changes to ``Uninstall'', allowing the picture's removal.
+
+\subsubsection{ Order}
+\label{sec:appl-devel-order}%
+
+\paragraph{Source Code}
+\label{sec:appl-devel-order-source-code}
+
+
+\begin{wideverbatim}
+
+# 03sep09abu
+# (c) Software Lab. Alexander Burger
+
+(must "Order" Order)
+
+(menu ,"Order"
+   (ifn *ID
+      (prog
+         (<h3> NIL ,"Select" " " ,"Order")
+         (form 'dialog (choOrd)) )
+      (<h3> NIL ,"Order")
+      (form NIL
+         (<h2> NIL (<id> (: nr)))
+         (panel T (pack ,"Order" " @1") '(may Delete) '(choOrd) 'nr '+Ord)
+         (<grid> 4
+            ,"Date" NIL
+            (gui '(+E/R +DateField) '(dat : home obj) 10)
+            (gui '(+View +TextField)
+               '(text ,"(@1 Positions)" (length (: home obj pos))) )
+            ,"Customer" (gui '(+ChoButton) '(choCuSu (field 1)))
+            (gui '(+E/R +Obj +TextField) '(cus : home obj) '(nm +CuSu) 30)
+            (gui '(+View +TextField) '(field -1 'obj 'ort) 30) )
+         (--)
+         (gui '(+Set +E/R +Chart) '((L) (filter bool L)) '(pos : home obj) 8
+            '((Pos I)
+               (with Pos
+                  (list I NIL (: itm) (or (: pr) (: itm pr)) (: cnt) (sum> Pos)) ) )
+            '((L D)
+               (cond
+                  (D
+                     (put!> D 'itm (caddr L))
+                     (put!> D 'pr (cadddr L))
+                     (put!> D 'cnt (; L 5))
+                     (and (; D itm) D) )
+                  ((caddr L)
+                     (new! '(+Pos) 'itm (caddr L)) ) ) ) )
+
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+
+         (<table> NIL NIL
+            '((align) (btn) (NIL ,"Item") (NIL ,"Price") (NIL ,"Quantity") (NIL ,"Total"))
+            (do 8
+               (<row> NIL
+                  (gui 1 '(+NumField))
+                  (gui 2 '(+ChoButton) '(choItem (field 1)))
+                  (gui 3 '(+Obj +TextField) '(nm +Item) 30)
+                  (gui 4 '(+FixField) 2 12)
+                  (gui 5 '(+NumField) 8)
+                  (gui 6 '(+Sgn +Lock +FixField) 2 12)
+                  (gui 7 '(+DelRowButton))
+                  (gui 8 '(+BubbleButton)) ) )
+            (<row> NIL NIL NIL (scroll 8 T) NIL NIL
+               (gui '(+Sgn +View +FixField) '(sum> (: home obj)) 2 12) ) )
+         (<spread>
+            (gui '(+Rid +Button) ,"PDF-Print"
+               '(if (check> (: home obj))
+                  (note ,"Can't print order" (uniq @))
+                  (psOut 0 ,"Order" (ps> (: home obj))) ) )
+            (editButton T) ) ) ) )
+
+# vi:et:ts=3:sw=3
+
+
+\end{wideverbatim}
+
+
+\paragraph{Discussion}
+\label{sec:appl-devel-order-discussion}
+
+Oders are identified by number and date.
+
+The number must be unique. It is assigned when the order is created, and
+cannot be changed for compliance reasons.
+
+The date is initialized to ``today'' for a newly created order, but may be
+changed manually. The date format depends on the locale. It is
+YYYY-MM-DD (ISO) by default, DD.MM.YYYY in the German and YYYY/MM/DD in
+the Japanese locale. As described in \emph{Time \& Date},
+this field allows input shortcuts, e.g. just enter the day to get the
+full date in the current month.
+
+To assign a customer to this order, click on the ``+'' button. The
+Customer/Supplier search dialog will appear, and you can pick the
+desired customer with the ``@'' button in the first column (or enter the
+name directly into the text field), just as described above for
+\emph{Item}s.
+
+Now enter order the positions: Choose an item with the ``+'' button. The
+``Price'' field will be preset with the item's default price, you may
+change it manually. Then enter a quantity, and click a button (typically
+the ``+'' button to select the next item, or a scroll button go down in
+the chart). The form will be automatically recalculated to show the
+total prices for this position and the whole order.
+
+Instead of the ``+'' or scroll buttons, as recommended above, you could of
+course also press the ``Done'' button to commit changes. This is all
+right, but has the disadvantage that the button must be pressed a second
+time (now ``Edit'') if you want to continue with the entry of more
+positions.
+
+The ``x'' button at the right of each position deletes that position
+without further confirmation. It has to be used with care!
+
+The ``\^'' button is a ``bubble'' button. It exchanges a row with the row
+above it. Therefore, it can be used to rearrange all items in a chart,
+by ``bubbling'' them to their desired positions.
+
+The ``PDF-Print'' button generates and displays a PDF document for this
+order. The browser should be configured to display downloaded PDF
+documents in an appropriate viewer. The source for the postscript
+generating method is in ``app/lib.l''. It produces one or several A4 sized
+pages, depending on the number of positions.
+
+
+\subsubsection{ Reports}
+\label{sec:appl-devel-reports}%
+
+\paragraph{Source Code}
+\label{sec:appl-devel-reports-source-code}
+
+
+\begin{wideverbatim}
+
+# 08mar10abu
+# (c) Software Lab. Alexander Burger
+
+(must "Inventory" Report)
+
+(menu ,"Inventory"
+   (<h3> NIL ,"Inventory")
+   (form NIL
+      (<grid> "-.-"
+         ,"Number" NIL
+         (prog
+            (gui '(+Var +NumField) '*InvFrom 10)
+            (prin " - ")
+            (gui '(+Var +NumField) '*InvTill 10) )
+         ,"Description" NIL (gui '(+Var +TextField) '*InvNm 30)
+         ,"Supplier" (gui '(+ChoButton) '(choCuSu (field 1)))
+         (gui '(+Var +Obj +TextField) '*InvSup '(nm +CuSu) 30) )
+      (--)
+      (gui '(+ShowButton) NIL
+         '(csv ,"Inventory"
+            (<table> 'chart NIL
+               (<!>
+                  (quote
+                     (align)
+                     (NIL ,"Description")
+                     (align ,"Inventory")
+                     (NIL ,"Supplier")
+                     NIL
+                     (NIL ,"Zip")
+                     (NIL ,"City")
+                     (align ,"Price") ) )
+               (catch NIL
+                  (pilog
+                     (quote
+                        @Rng (cons *InvFrom (or *InvTill T))
+                        @Nm *InvNm
+                        @Sup *InvSup
+                        (select (@Item)
+                           ((nr +Item @Rng) (nm +Item @Nm) (sup +Item @Sup))
+                           (range @Rng @Item nr)
+                           (tolr @Nm @Item nm)
+                           (same @Sup @Item sup) ) )
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+                     (with @Item
+                        (<row> (alternating)
+                           (<+> (: nr) This)
+                           (<+> (: nm) This)
+                           (<+> (cnt> This))
+                           (<+> (: sup nm) (: sup))
+                           (<+> (: sup nm2))
+                           (<+> (: sup plz))
+                           (<+> (: sup ort))
+                           (<-> (money (: pr))) ) )
+                     (at (0 . 10000) (or (flush) (throw))) ) ) ) ) ) ) )
+# vi:et:ts=3:sw=3
+\end{wideverbatim}
+
+
+\begin{wideverbatim}
+
+# 08mar10abu
+# (c) Software Lab. Alexander Burger
+
+(must "Sales" Report)
+
+(menu ,"Sales"
+   (<h3> NIL ,"Sales")
+   (form NIL
+      (<grid> "-.-"
+         ,"Date" NIL
+         (prog
+            (gui '(+Var +DateField) '*SalFrom 10)
+            (prin " - ")
+            (gui '(+Var +DateField) '*SalTill 10) )
+         ,"Customer" (gui '(+ChoButton) '(choCuSu (field 1)))
+         (gui '(+Var +Obj +TextField) '*SalCus '(nm +CuSu) 30) )
+      (--)
+      (gui '(+ShowButton) NIL
+         '(csv ,"Sales"
+            (<table> 'chart NIL
+               (<!>
+                  (quote
+                     (align)
+                     (NIL ,"Date")
+                     (NIL ,"Customer")
+                     NIL
+                     (NIL ,"Zip")
+                     (NIL ,"City")
+                     (align ,"Total") ) )
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+               (catch NIL
+                  (let Sum 0
+                     (pilog
+                        (quote
+                           @Rng (cons *SalFrom (or *SalTill T))
+                           @Cus *SalCus
+                           (select (@Ord)
+                              ((dat +Ord @Rng) (cus +Ord @Cus))
+                              (range @Rng @Ord dat)
+                              (same @Cus @Ord cus) ) )
+                        (with @Ord
+                           (let N (sum> This)
+                              (<row> (alternating)
+                                 (<+> (: nr) This)
+                                 (<+> (datStr (: dat)) This)
+                                 (<+> (: cus nm) (: cus))
+                                 (<+> (: cus nm2))
+                                 (<+> (: cus plz))
+                                 (<+> (: cus ort))
+                                 (<-> (money N)) )
+                              (inc 'Sum N) ) )
+                        (at (0 . 10000) (or (flush) (throw))) )
+                     (<row> 'nil
+                        (<strong> ,"Total") - - - - -
+                        (<strong> (prin (money Sum))) ) ) ) ) ) ) ) )
+
+# vi:et:ts=3:sw=3
+
+
+\end{wideverbatim}
+
+\paragraph{Discussion}
+\label{sec:appl-devel-reports-discussion}
+
+The two reports (``Inventory'' and ``Sales'') come up with a few search
+fields and a ``Show'' button.
+
+If no search criteria are entered, the ``Show'' button will produce a
+listing of the relevant part of the whole database. This may take a long
+time and cause a heavy load on the browser if the database is large.
+
+So in the normal case, you will limit the domain by stating a range of
+item numbers, a description pattern, and/or a supplier for the inventory
+report, or a range of order dates and/or a customer for the sales
+report. If a value in a range specification is omitted, the range is
+considered open in that direction.
+
+At the end of each report appears a ``CSV'' link. It downloads a file with
+the TAB-separated values generated by this report.
+
+

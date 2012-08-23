@@ -1,0 +1,138 @@
+\title{Even small details make a difference!}
+\input{mainmatter/authors/alex}
+\maketitle
+
+
+% 16jul12
+% Alexander Burger
+
+% \documentclass[10pt,a4paper]{article}
+% \usepackage{graphicx}
+
+% \textwidth 1.4\textwidth
+% \textheight 1.125\textheight
+% \oddsidemargin 0em
+% \evensidemargin 0em
+% \headsep 0em
+% \parindent 0em
+% \parskip 6pt
+
+% \title{Even small details make a difference!}
+% \author{Alexander Burger\\abu@software-lab.de}
+% \date{2011-07-29}
+
+% \begin{document}
+% \maketitle
+
+\begin{abstract}
+  This article discusses how it's unique implementation of the
+  \texttt{quote} function makes PicoLisp more efficient than other
+  Lisp's in terms of both space and time. 
+\end{abstract}
+
+\section{Even small details make a difference!}
+\label{sec:quote-small-details}
+
+In Lisp, the single quote character plays a central role. It is actually a
+\textit{read macro}, which expands to the built-in function \texttt{quote}. Its purpose is
+to inhibit the evaluation of the following argument, and \texttt{quote} is one of the
+most often called functions.
+
+But it is remarkable that almost all Lisp implementations handle this in a
+somewhat suboptimal way. They define \texttt{quote} to return its \textit{first} argument,
+without evaluating it. So far so good. But when you think about that for a
+moment, you may ask: ``Why only the first argument?''
+
+This is inefficient, both in terms of space and time, and has no benefit at all.
+Yet almost all Lisp implementations stick to it.
+
+PicoLisp breaks with that bad habit, and defines \texttt{quote} to return \textit{all}
+arguments, without evaluating them.
+
+Let's look at some examples: Quoted expressions like
+\begin{wideverbatim}
+   'a
+   '(a b)
+   '(a . x)
+\end{wideverbatim}
+
+expand in traditional Lisps to
+\begin{wideverbatim}
+   (quote a)
+   (quote (a b))
+   (quote (a . x))
+\end{wideverbatim}
+
+while in PicoLisp, they expand to
+\begin{wideverbatim}
+   (quote . a)
+   (quote a b)
+   (quote a . x)
+\end{wideverbatim}
+
+This makes quite a difference, as it uses only half the space (two cells in
+traditional Lisp, but only one in PicoLisp):
+\begin{wideverbatim}
+   (quote a)
+      +-------+-------+      +-------+-------+
+      | quote |   ----+----> |   a   |  NIL  |
+      +-------+-------+      +-------+-------+
+
+   (quote . a)
+      +-------+-------+
+      | quote |   a   |
+      +-------+-------+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+   (quote (a b))
+      +-------+-------+      +-------+-------+
+      | quote |   ----+----> |   |   |  NIL  |
+      +-------+-------+      +---+---+-------+
+                                 |
+                                 V
+                             +-------+-------+      +-------+-------+
+                             |   a   |   ----+----> |   b   |  NIL  |
+                             +-------+-------+      +-------+-------+
+
+   (quote a b)
+      +-------+-------+      +-------+-------+      +-------+-------+
+      | quote |   ----+----> |   a   |   ----+----> |   b   |  NIL  |
+      +-------+-------+      +-------+-------+      +-------+-------+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+   (quote (a . x))
+      +-------+-------+      +-------+-------+
+      | quote |   ----+----> |   |   |  NIL  |
+      +-------+-------+      +---+---+-------+
+                                 |
+                                 V
+                             +-------+-------+
+                             |   a   |   x   |
+                             +-------+-------+
+
+   (quote a . x)
+      +-------+-------+      +-------+-------+
+      | quote |   ----+----> |   a   |   x   |
+      +-------+-------+      +-------+-------+
+\end{wideverbatim}
+
+The runtime code for a traditional \texttt{quote} has more work to do. It needs two
+pointer dereferences to get the data, while PicoLisp needs only one.
+
+For that reason, \texttt{quote} is the shortest of all functions in PicoLisp, being
+\begin{wideverbatim}
+   any doQuote(any x) {return cdr(x);}
+\end{wideverbatim}
+
+in \texttt{C}, or
+\begin{wideverbatim}
+   (code 'doQuote 2)
+      ld E (E CDR)  # Get CDR
+      ret
+\end{wideverbatim}
+
+in \texttt{asm}.
+
+

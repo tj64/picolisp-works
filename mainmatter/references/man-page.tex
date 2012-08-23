@@ -1,0 +1,163 @@
+\title{Manual Page}
+\input{mainmatter/authors/alex}
+\maketitle
+
+% \section{Manual Page}
+% \label{sec:manpage-manual-page}
+
+\begin{abstract}
+  This is the PicoLisp Manual Page.
+\end{abstract}
+
+\section{NAME}
+\label{sec:manpage-name}
+
+
+pil, picolisp - a fast, lightweight Lisp interpreter
+
+ 
+\section{SYNOPSIS}
+\label{sec:manpage-synopsis}
+
+
+\textbf{pil} [arguments \ldots{}] [-] [arguments \ldots{}] [+]
+ \textbf{/installpath/bin/picolisp} [arguments \ldots{}] [-] [arguments \ldots{}] [+]
+
+ 
+\section{DESCRIPTION}
+\label{sec:manpage-description}
+
+\begin{description}
+
+\item[PicoLisp] is a Lisp interpreter with a small memory footprint, yet
+relatively high execution speed. It combines an elegant and powerful
+language with built-in database functionality.
+
+\item[pil] is the startup front-end for the interpreter. It takes care of
+starting the binary base system and loading a useful runtime
+environment.
+
+\item[picolisp] is just the bare interpreter binary. It is usually called in
+stand-alone scripts, using the she-bang notation in the first line,
+passing the minimal environment in \emph{lib.l} and loading additional files
+as needed:
+
+\end{description}
+
+\begin{wideverbatim}
+(load ``@ext.l'' ``myfiles/lib.l'' ``myfiles/foo.l'')
+
+(do \ldots{} something \ldots{})
+
+(bye)
+\end{wideverbatim}
+
+ 
+\section{INVOCATION}
+\label{sec:manpage-invocation}
+
+
+\textbf{PicoLisp} has no pre-defined command line flags; applications are free
+to define their own. Any built-in or user-level Lisp function can be
+invoked from the command line by prefixing it with a hyphen. Examples
+for built-in functions useful in this context are \textbf{version} (print the
+version number) or \textbf{bye} (exit the interpreter). Therefore, a minimal
+call to print the version number and then immediately exit the
+interpreter would be:
+
+\begin{wideverbatim}
+$ pil -version -bye
+\end{wideverbatim}
+
+Any other argument (not starting with a hyphen) should be the name of a
+file to be loaded. If the first character of a path or file name is an
+at-mark, it will be substituted with the path to the installation
+directory.
+
+All arguments are evaluated from left to right, then an interactive
+\emph{read-eval-print} loop is entered (with a colon as prompt).
+
+A single hyphen stops the evaluation of the rest of the command line, so
+that the remaining arguments may be processed under program control.
+
+If the very last command line argument is a single plus character,
+debugging mode is switched on at interpreter startup, before evaluating
+any of the command line arguments. A minimal interactive session is
+started with:
+
+\begin{wideverbatim}
+$ pil +
+\end{wideverbatim}
+
+
+Here you can access the reference manual
+
+\begin{wideverbatim}
+ (doc)
+\end{wideverbatim}
+
+and the online documentation for most functions,
+
+\begin{wideverbatim}
+ (doc 'vi)
+\end{wideverbatim}
+
+or directly inspect their sources:
+
+\begin{wideverbatim}
+ (vi 'doc)
+\end{wideverbatim}
+
+The interpreter can be terminated with
+
+\begin{wideverbatim}
+ (bye)
+\end{wideverbatim}
+
+or by typing Ctrl-D.
+
+ 
+\section{FILES}
+\label{sec:manpage-files}
+
+
+Runtime files are maintained in the \~{}/.pil directory:
+
+\begin{wideverbatim}
+~{}/.pil/tmp/<pid>/
+\end{wideverbatim}
+
+
+Process-local temporary directories
+
+\begin{wideverbatim}
+~{}/.pil/history
+\end{wideverbatim}
+
+The line editor's history file
+
+ 
+\section{BUGS}
+\label{sec:manpage-bugs}
+
+
+\textbf{PicoLisp} doesn't try to protect you from every possible programming
+error (``You asked for it, you got it'').
+
+ 
+\section{AUTHOR}
+\label{sec:manpage-author}
+
+
+Alexander Burger \href{mailto:abu@software-lab.de}{abu@software-lab.de}
+
+ 
+\section{RESOURCES}
+\label{sec:manpage-resources}
+
+
+\textbf{Home page:}
+\href{http://home.picolisp.com}{http://home.picolisp.com}
+
+\textbf{Download:}
+\href{http://www.software-lab.de/down.html}{http://www.software-lab.de/down.html}

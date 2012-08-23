@@ -1,0 +1,712 @@
+\title{Frequently Asked Questions (FAQ)}
+\input{mainmatter/authors/alex}
+\maketitle
+
+\begin{quote}
+  \begin{flushleft}
+   Monk: ``If I have nothing in my mind, what shall I do?''\\
+   Joshu: ``Throw it out.''\\
+    \emph{Monk: ``But if there is nothing, how can I throw it out?''\\
+    Joshu: ``Well, then carry it out.''\\ (Zen koan)}
+  \end{flushleft}
+\end{quote}
+
+\begin{abstract}
+These are the official FAQ for PicoLisp. 
+\end{abstract}
+
+\section{Why did you write yet another Lisp?}
+\label{sec:faq-why-did-you-write-yet-another-lisp?}
+
+
+Because other Lisps are not the way I'd like them to be. They
+concentrate on efficient compilation, and lost the one-to-one
+relationship of language and virtual machine of an interpreted system,
+gave up power and flexibility, and impose unnecessary limitations on the
+freedom of the programmer. Other reasons are the case-insensitivity and
+complexity of current Lisp systems.
+
+ 
+\section{Who can use PicoLisp?}
+\label{sec:faq-who-can-use-picolisp?}
+
+
+PicoLisp is for programmers who want to control their programming
+environment, at all levels, from the application domain down to the bare
+metal. Who want use a transparent and simple - yet universal -
+programming model, and want to know exactly what is going on. This is an
+aspect influenced by \texttt{Forth}.
+
+It does \emph{not} pretend to be easy to learn. There are already plenty of
+languages that do so. It is not for people who don't care what's under
+the hood, who just want to get their application running. They are
+better served with some standard, ``safe'' black-box, which may be easier
+to learn, and which allegedly better protects them from their own
+mistakes.
+
+ 
+\section{What are the advantages over other Lisp systems?}
+\label{sec:faq-what-are-the-advantages-over-other-lisp-systems?}
+\subsection{Simplicity}
+\label{sec:faq-simplicity}
+
+
+PicoLisp is easy to understand and adapt. There is no compiler enforcing
+special rules, and the interpreter is simple and straightforward. There
+are only three data types: Numbers, symbols and lists (``LISP'' means
+``List-, Integer- and Symbol Processing'' after all ;-). The memory
+footprint is minimal, and the tarball size of the whole system is just a
+few hundred kilobytes.
+\subsection{A Clear Model}
+\label{sec:faq-a-clear-model}
+
+
+Most other systems define the language, and leave it up to the
+implementation to follow the specifications. Therefore, language
+designers try to be as abstract and general as possible, leaving many
+questions and ambiguities to the users of the language.
+
+PicoLisp does the opposite. Initially, only the single-cell data
+structure was defined, and then the structure of numbers, symbols and
+lists as they are composed of these cells. Everything else in the whole
+system follows from these axioms. This is documented in the chapter
+about the \hyperref[ref.html-vm]{The PicoLisp Machine} in the reference manual.
+\subsection{Orthogonality}
+\label{sec:faq-orthogonality}
+
+
+There is only one symbolic data type, no distinction (confusion) between
+symbols, strings, variables, special variables and identifiers.
+
+Most data-manipulation functions operate on the value cells of symbols
+as well as the CARs of list cells:
+
+
+\begin{wideverbatim}
+: (let (N 7  L (7 7 7)) (inc 'N) (inc (cdr L)) (cons N L))
+-> (8 7 8 7)
+\end{wideverbatim}
+
+There is only a single functional type, no ``special forms''. As there is
+no compiler, functions can be used instead of macros. No special
+``syntax'' constructs are needed. This allows a completely orthogonal use
+of functions. For example, most other Lisps do not allow calls like
+
+
+\begin{wideverbatim}
+: (mapcar if '(T NIL T NIL) '(1 2 3 4) '(5 6 7 8))
+-> (1 6 3 8)
+\end{wideverbatim}
+
+PicoLisp has no such restrictions. It favors the principle of ``Least
+Astonishment''.
+\subsection{Object System}
+\label{sec:faq-object-system}
+
+
+The OOP system is very powerful, because it is fully dynamic, yet
+extremely simple:
+
+\begin{itemize}
+\item In other systems you have to statically declare ``slots''. In PicoLisp,
+   classes and objects are completely dynamic, they are created and
+   extended at runtime. ``Slots'' don't even exist at creation time. They
+   spring into existence purely dynamically. You can add any new
+   property or any new method to any single object, at any time,
+   regardless of its class.
+\item The multiple inheritance is such that not only classes can have
+   several superclasses, but each individual object can be of more than
+   one class.
+\item Prefix classes can surgically change the inheritance tree for any
+   class or object. They behave like Mixins in this regard.
+\item Fine-control of inheritance in methods with \texttt{super} and \texttt{extra}.
+\end{itemize}
+\subsection{Pragmatism}
+\label{sec:faq-pragmatism}
+
+
+PicoLisp has many practical features not found in other Lisp dialects.
+Among them are:
+
+\begin{itemize}
+\item Auto-quoting of lists when the CAR is a number. Instead of \texttt{'(1 2 3)}    you can just write \texttt{(1 2 3)}. This is possible because a number never
+   makes sense as a function name, and has to be checked at runtime
+   anyway.
+\item The \texttt{quote} function returns all unevaluated arguments, instead of
+   just the first one. This is both faster (\texttt{quote} does not have to
+   take the CAR of its argument list) and smaller (a single cell instead
+   of two). For example, \TEXTTT{'A} expands to \texttt{(quote . A)} and \texttt{'(A B C)}    expands to \texttt{(quote A B C)}.
+\item The symbol \texttt{@} is automatically maintained as a local variable, and
+   set implicitly in certain flow- and logic-functions. This makes it
+   often unnecessary to allocate and assign local variables.
+\item \hyperref[tut.html-funio]{Functional I/O} is more convenient than explicitly
+   passing around file descriptors.
+\item A well-defined \hyperref[ref.html-cmp]{ordinal relationship} between
+   arbitrary data types facilitates generalized comparing and sorting.
+\item Uniform handling of \texttt{var} locations (i.e. values of symbols and CARs
+   of list cells).
+\item The universality and usefulness of symbol properties is enforced and
+   extended with implicit and explicit bindings of the symbol \texttt{This} in
+   combination with the access functions \texttt{=:}  \texttt{:} and \texttt{::}.
+\item A very convenient list-building machinery, using the \texttt{link}, \texttt{yoke},
+   \texttt{chain} and \texttt{made} functions in the \texttt{make} environment.
+\item The syntax of often-used functions is kept non-verbose. For example,
+   instead of \texttt{(let ((A 1) (B 2) C 3) ..)} you write
+   \texttt{(let (A 1 B 2 C 3) ..)}, or just \texttt{(let A 1 ..)} if there is only a
+   single variable.
+\item The use of the hash (\texttt{\#}) as a comment character is more adequate
+   today, and allows a clean hash-bang (\texttt{\#!}) syntax for stand-alone
+   scripts.
+\item The interpreter is \hyperref[ref.html-invoc]{invoked} with a simple and
+   flexible syntax, where command line arguments are either files to be
+   interpreted or functions to be directly executed. With that, many
+   tasks can be performed without writing a separate
+   \hyperref[tut.html-script]{script}.
+\item A sophisticated system of interprocess communication, file locking
+   and synchronization allows multi-user access to database
+   applications.
+\item A Prolog interpreter is tightly integrated into the language. Prolog
+   clauses can call Lisp expressions and vice versa, and a
+   self-adjusting depth-first search predicate \texttt{select} can be used in
+   database queries.
+\end{itemize}
+
+\subsection{Persistent Symbols}
+\label{sec:faq-persistent-symbols}
+
+
+Database objects (``external'' symbols) are a primary data type in
+PicoLisp. They look like normal symbols to the programmer, but are
+managed in the database (fetched from, and stored to) automatically by
+the system. Symbol manipulation functions like \texttt{set}, \texttt{put} or \texttt{get},
+the garbage collector, and other parts of the interpreter know about
+them.
+\subsection{Application Server}
+\label{sec:faq-application-server}
+
+
+It is a stand-alone system (it does not depend on external programs like
+Apache or MySQL) and it provides a ``live'' user interface on the client
+side, with an application server session for each connected client. The
+GUI layout and behavior are described with S-expressions, generated
+dynamically at runtime, and interact directly with the database
+structures.
+\subsection{Localization}
+\label{sec:faq-localization}
+
+
+Internal exclusive and full use of UTF--8 encoding, and self-translating
+\hyperref[ref.html-transient-io]{transient symbols} (strings), make it easy to
+write country- and language-independent applications.
+
+ 
+\section{How is the performance compared to other Lisp systems?}
+\label{sec:faq-how-is-the-performance-compared-to-other-lisp-systems?}
+
+
+Despite the fact that PicoLisp is an interpreted-only system, the
+performance is quite good. Typical Lisp programs operating on list data
+structures are executed in (interpreted) PicoLisp at about the same
+speed as in (compiled) CMUCL, and about two or three times faster than
+in CLisp or Scheme48. Programs with lots of numeric calculations,
+however, may be slower on a 32-bit system, due to PicoLisp's somewhat
+inefficient implementation of numbers. The 64-bit version improved on
+that.
+
+But in practice, speed was never a problem, even with the first versions
+of PicoLisp in 1988 on a Mac II with a 12 MHz CPU. And certain things
+are cleaner and easier to do in plain \texttt{C} or \texttt{asm} anyway. It is very
+easy to write \texttt{C} functions in PicoLisp, either in the kernel, as shared
+object libraries, or even inline in the Lisp code.
+
+PicoLisp is very space-effective. Other Lisp systems reserve heap space
+twice as much as needed, or use rather large internal structures to
+store cells and symbols. Each cell or minimal symbol in PicoLisp
+consists of only two pointers. No additional tags are stored, because
+they are implied in the pointer encodings. No gaps remain in the heap
+during allocation, as there are only objects of a single size. As a
+result, consing and garbage collection are very fast, and overall
+performance benefits from a better cache efficiency. Heap and stack grow
+automatically, and are limited only by hardware and operating system
+constraints.
+
+ 
+\section{What means ``interpreted''?}
+\label{sec:faq-what-means-interpreted?}
+
+
+It means to directly execute Lisp data as program code. No
+transformation to another representation of the code (e.g. compilation),
+and no structural modifications of these data, takes place.
+
+Lisp data are the ``real'' things, like numbers, symbols and lists, which
+can be directly handled by the system. They are \emph{not} the textual
+representation of these structures (which is outside the Lisp realm and
+taken care of the \texttt{read} ng and \texttt{print} ng interfaces).
+
+The following example builds a function and immediately calls it with
+two arguments:
+
+
+\begin{wideverbatim}
+: ((list (list 'X 'Y) (list '* 'X 'Y)) 3 4)
+-> 12
+\end{wideverbatim}
+
+Note that no time is wasted to build up a lexical environment. Variable
+bindings take place dynamically during interpretation.
+
+A PicoLisp function is able to inspect or modify itself while it is
+running (though this is rarely done in application programming). The
+following function modifies itself by incrementing the `0' in its body:
+
+
+\begin{wideverbatim}
+(de incMe ()
+   (do 8
+      (printsp 0)
+      (inc (cdadr (cdadr incMe))) ) )
+
+: (incMe)
+0 1 2 3 4 5 6 7 -> 8
+: (incMe)
+8 9 10 11 12 13 14 15 -> 16
+\end{wideverbatim}
+
+Only an interpreted Lisp can fully support such ``Equivalence of Code and
+Data''. If executable pieces of data are used frequently, like in
+PicoLisp's dynamically generated GUI, a fast interpreter is preferable
+over any compiler.
+
+ 
+\section{Is there (or will be in the future) a compiler available?}
+\label{sec:faq-is-there-(or-will-be-in-the-future)-a-compiler-available?}
+
+
+No. That would contradict the idea of PicoLisp's simple virtual machine
+structure. A compiler transforms it to another (physical) machine, with
+the result that many assumptions about the machine's behavior won't hold
+any more. Besides that, PicoLisp primitive functions evaluate their
+arguments independently and are not suited for being called from
+compiled code. Finally, the gain in execution speed would probably not
+be worth the effort. Typical PicoLisp applications often use single-pass
+code which is loaded, executed and thrown away; a process that would be
+considerably slowed down by compilation.
+
+ 
+\section{Is it portable?}
+\label{sec:faq-is-it-portable?}
+
+
+Yes and No. Though we wrote and tested PicoLisp originally only on
+Linux, it now also runs on FreeBSD, Mac OS X (Darwin), Cygwin/Win32, and
+probably other POSIX systems. The first versions were even fully
+portable between DOS, SCO-Unix and Macintosh systems. But today we have
+Linux. Linux itself is very portable, and you can get access to a Linux
+system almost everywhere. So why bother?
+
+The GUI is completely platform independent (Browser), and in the times
+of Internet an application server does not really need to be portable.
+
+ 
+\section{Is PicoLisp a web server?}
+\label{sec:faq-is-picolisp-a-web-server?}
+
+
+Not really, but it evolved a great deal into that direction.
+
+Historically it was the other way round: We had a plain X11 GUI for our
+applications, and needed something platform independent. The solution
+was obvious: Browsers are installed virtually everywhere. So we
+developed a protocol which persuades a browser to function as a GUI
+front-end to our applications. This is much simpler than to develop a
+full-blown web server.
+
+ 
+\section{I cannot find the LAMBDA keyword in PicoLisp}
+\label{sec:faq-i-cannot-find-the-lambda-keyword-in-picolisp}
+
+
+Because it isn't there. The reason is that it is redundant; it is
+equivalent to the \texttt{quote} function in any aspect, because there's no
+distinction between code and data in PicoLisp, and \texttt{quote} returns the
+whole (unevaluated) argument list. If you insist on it, you can define
+your own \texttt{lambda}:
+
+
+\begin{wideverbatim}
+: (def 'lambda quote)
+-> lambda
+: ((lambda (X Y) (+ X Y)) 3 4)
+-> 7
+: (mapcar (lambda (X) (+ 1 X)) '(1 2 3 4 5))
+-> (2 3 4 5 6)
+\end{wideverbatim}
+
+ 
+\section{Why do you use dynamic variable binding?}
+\label{sec:faq-why-do-you-use-dynamic-variable-binding?}
+
+
+Dynamic binding is very powerful, because there is only one single,
+dynamically changing environment active all the time. This makes it
+possible (e.g. for program snippets, interspersed with application data
+and/or passed over the network) to access the whole application context,
+freely, yet in a dynamically controlled manner. And (shallow) dynamic
+binding is the fastest method for a Lisp interpreter.
+
+Lexical binding is more limited by definition, because each environment
+is deliberately restricted to the visible (textual) static scope within
+its establishing form. Therefore, most Lisps with lexical binding
+introduce ``special variables'' to support dynamic binding as well, and
+constructs like \texttt{labels} to extend the scope of variables beyond a
+single function.
+
+In PicoLisp, function definitions are normal symbol values. They can be
+dynamically rebound like other variables. As a useful real-world
+example, take this little gem:
+
+
+\begin{wideverbatim}
+(de recur recurse
+   (run (cdr recurse)) )
+\end{wideverbatim}
+
+It implements anonymous recursion, by defining \texttt{recur} statically and
+\texttt{recurse} dynamically. Usually it is very cumbersome to think up a name
+for a function (like the following one) which is used only in a single
+place. But with \texttt{recur} and \texttt{recurse} you can simply write:
+
+
+\begin{wideverbatim}
+: (mapcar
+   '((N)
+      (recur (N)
+         (if (=0 N)
+            1
+            (* N (recurse (- N 1))) ) ) )
+   (1 2 3 4 5 6 7 8) )
+-> (1 2 6 24 120 720 5040 40320)
+\end{wideverbatim}
+
+Needless to say, the call to \texttt{recurse} does not have to reside in the
+same function as the corresponding \texttt{recur}. Can you implement anonymous
+recursion so elegantly with lexical binding?
+
+ 
+\section{Are there no problems caused by dynamic binding?}
+\label{sec:faq-are-there-no-problems-caused-by-dynamic-binding?}
+
+
+You mean the \emph{funarg} problem, or problems that arise when a variable
+might be bound to \emph{itself}? For that reason we have a convention in
+PicoLisp to use \hyperref[ref.html-transient-io]{transient symbols} (instead of
+internal symbols)
+
+\begin{enumerate}
+\item for all parameters and locals, when functional arguments or
+   executable lists are passed through the current dynamic bindings
+\item for a parameter or local, when that symbol might possibly be
+   (directly or indirectly) bound to itself, and the bound symbol's
+   value is accessed in the dynamic context
+\end{enumerate}
+
+This is a form of lexical \emph{scoping} - though we still have dynamic
+\emph{binding} - of symbols, similar to the \texttt{static} keyword in \texttt{C}.
+
+In fact, these problems are a real threat, and may lead to mysterious
+bugs (other Lisps have similar problems, e.g. with symbol capture in
+macros). They can be avoided, however, when the above conventions are
+observed. As an example, consider a function which doubles the value in
+a variable:
+
+
+\begin{wideverbatim}
+(de double (Var)
+   (set Var (* 2 (val Var))) )
+\end{wideverbatim}
+
+This works fine, as long as we call it as \texttt{(double 'X)}, but will break
+if we call it as \texttt{(double 'Var)}. Therefore, the correct implementation
+of \texttt{double} should be:
+
+
+\begin{wideverbatim}
+(de double ("Var")
+   (set "Var" (* 2 (val "Var"))) )
+\end{wideverbatim}
+
+If \texttt{double} is defined that way in a separate source file,
+and/or isolated via the \texttt{====} function, then the symbol
+\texttt{Var} is locked into a private lexical context and cannot
+conflict with other symbols.
+
+Admittedly, there are two disadvantages with this solution:
+
+\begin{enumerate}
+\item The rules for when to use transient symbols are a bit complicated.
+   Though it is safe to use them even when not necessary, it will take
+   more space then and be more difficult to debug.
+\item The string-like syntax of transient symbols as variables may look
+   strange to alumni of other languages.
+\end{enumerate}
+
+Fortunately, these pitfalls do not occur so very often, and seem more
+likely in utilities than in production code, so that they can be easily
+encapsulated.
+
+ 
+\section{But with dynamic binding I cannot implement closures!}
+\label{sec:faq-but-with-dynamic-binding-i-cannot-implement-closures!}
+
+
+This is not true. Closures are a matter of scope, not of binding.
+
+For a closure it is necessary to build and maintain a separate
+environment. In a system with lexical bindings, this has to be done at
+\emph{each} function call, and for compiled code it is the most efficient
+strategy anyway, because it is done once by the compiler, and can then
+be accessed as stack frames at runtime.
+
+For an interpreter, however, this is quite an overhead. So it should not
+be done automatically at each and every function invocation, but only if
+needed.
+
+You have several options in PicoLisp. For simple cases, you can take
+advantage of the static scope of \hyperref[ref.html-transient-io]{transient symbols}. For the general case, PicoLisp has built-in functions like
+\texttt{bind} or \texttt{job}, which dynamically manage statically scoped
+environments.
+
+Environments are first-class objects in PicoLisp, more flexible than
+hard-coded closures, because they can be created and manipulated
+independently from the code.
+
+As an example, consider a currying function:
+
+
+\begin{wideverbatim}
+(de curry Args
+   (list (car Args)
+      (list 'list
+         (lit (cadr Args))
+         (list 'cons ''job
+            (list 'cons
+               (list 'lit (list 'env (lit (car Args))))
+               (lit (cddr Args)) ) ) ) ) )
+\end{wideverbatim}
+
+When called, it returns a function-building function which may be
+applied to some argument:
+
+
+\begin{wideverbatim}
+: ((curry (X) (N) (* X N)) 3)
+-> ((N) (job '((X . 3)) (* X N)))
+\end{wideverbatim}
+
+or used as:
+
+
+\begin{wideverbatim}
+: (((curry (X) (N) (* X N)) 3) 4)
+-> 12
+\end{wideverbatim}
+
+In other cases, you are free to choose a shorter and faster solution. If
+(as in the example above) the curried argument is known to be immutable:
+
+
+\begin{wideverbatim}
+(de curry Args
+   (list
+      (cadr Args)
+      (list 'fill
+         (lit (cons (car Args) (cddr Args)))
+         (lit (cadr Args)) ) ) )
+\end{wideverbatim}
+
+Then the function built above will just be:
+
+
+\begin{wideverbatim}
+: ((curry (X) (N) (* X N)) 3)
+-> ((X) (* X 3))
+\end{wideverbatim}
+
+In that case, the ``environment build-up'' is reduced by a simple
+(lexical) constant substitution with zero runtime overhead.
+
+Note that the actual \texttt{curry} function is simpler and more pragmatic. It
+combines both strategies (to use \texttt{job}, or to substitute), deciding at
+runtime what kind of function to build.
+
+ 
+\section{Do you have macros?}
+\label{sec:faq-do-you-have-macros?}
+
+
+Yes, there is a macro mechanism in PicoLisp, to build and immediately
+execute a list of expressions. But it is seldom used. Macros are a
+kludge. Most things where you need macros in other Lisps are directly
+expressible as functions in PicoLisp, which (as opposed to macros) can
+be applied, passed around, and debugged.
+
+ 
+\section{Why are there no strings?}
+\label{sec:faq-why-are-there-no-strings?}
+
+
+Because PicoLisp has something better:
+\hyperref[ref.html-transient-io]{Transient symbols}. They look and behave like
+strings in any respect, but are nevertheless true symbols, with a value
+cell and a property list.
+
+This leads to interesting opportunities. The value cell, for example,
+can point to other data that represent the string's translation. This is
+used extensively for localization. When a program calls
+
+
+\begin{wideverbatim}
+(prinl "Good morning!")
+\end{wideverbatim}
+
+then changing the value of the symbol \texttt{''Good morning!''} to its
+translation will change the program's output at runtime.
+
+Transient symbols are also quite memory-conservative. As they are stored
+in normal heap cells, no additional overhead for memory management is
+induced. The cell holds the symbol's value in its CDR, and the tail in
+its CAR. If the string is not longer than 7 bytes, it fits (on the
+64-bit version) completely into the tail, and a single cell suffices. Up
+to 15 bytes take up two cells, 23 bytes three etc., so that long strings
+are not very efficient (needing twice the memory on the average), but
+this disadvantage is made up by simplicity and uniformity. And lots of
+extremely long strings are not the common case, as they are split up
+anyway during processing, and stored as plain byte sequences in external
+files and databases.
+
+Because transient symbols are temporarily interned (while \texttt{load} ng the
+current source file), they are shared within the same source and occupy
+that space only once, even if they occur multiple times within the same
+file.
+
+ 
+\section{What about arrays?}
+\label{sec:faq-what-about-arrays?}
+
+
+PicoLisp has no array or vector data type. Instead, lists must be used
+for any type of sequentially arranged data.
+
+We believe that arrays are usually overrated. Textbook wisdom tells that
+they have a constant access time O(1) when the index is known. Many
+other operations like splits or insertions are rather expensive. Access
+with a known (numeric) index is not really typical for Lisp, and even
+then the advantage of an array is significant only if it is relatively
+long. Holding lots of data in long arrays, however, smells quite like a
+program design error, and we suspect that often more structured
+representations like trees or interconnected objects would be better.
+
+In practice, most arrays are rather short, or the program can be
+designed in such a way that long arrays (or at least an indexed access)
+are avoided.
+
+Using lists, on the other hand, has advantages. We have so many
+concerted functions that uniformly operate on lists. There is no
+separate data type that has to be handled by the interpreter, garbage
+collector, I/O, database and so on. Lists can be made circular. And
+lists don't cause memory fragmentation.
+
+ 
+\section{How to do floating point arithmetics?}
+\label{sec:faq-how-to-do-floating-point-arithmetics?}
+
+
+PicoLisp does not support real floating point numbers. You can do all
+kinds of floating point calculations by calling existing library
+functions via \texttt{native}, inline-C code, and/or by loading the
+``@lib/math.l'' library.
+
+But PicoLisp has something even (arguably) better: Scaled
+\hyperref[ref.html-num-io]{fixpoint numbers}, with unlimited precision.
+
+The reasons for this design decision are manifold. Floating point
+numbers smack of imperfection, they don't give ``exact'' results, have
+limited precision and range, and require an extra data type. It is hard
+to understand what really goes on (How many digits of precision do we
+have today? Are perhaps 10-byte floats used for intermediate results?
+How does rounding behave?).
+
+For fixpoint support, the system must handle just integer arithmetics,
+I/O and string conversions. The rest is under programmer's control and
+responsibility (the essence of PicoLisp).
+
+Carefully scaled fixpoint calculations can do anything floating points
+can do.
+
+ 
+\section{What happens when I locally bind a symbol which has a function
+definition?} 
+\label{sec:faq-what-happens-when-i-locally-bind-a-symbol-which-has-a-function}
+
+That's not a good idea. The next time that function gets executed within
+the dynamic context the system may crash. Therefore we have a convention
+to use an upper case first letter for locally bound symbols:
+
+
+\begin{wideverbatim}
+(de findCar (Car List)
+   (when (member Car (cdr List))
+      (list Car (car List)) ) )
+\end{wideverbatim}
+
+;-)
+
+ 
+\section{Would it make sense to build PicoLisp in hardware?}
+\label{sec:faq-would-it-make-sense-to-build-picolisp-in-hardware?}
+
+
+At least it should be interesting. It would be a machine executing list
+(tree) structures instead of linear instruction sequences. ``Instruction
+prefetch'' would look down the CAR- and CDR-chains, and perhaps need only
+a single cache for both data and instructions.
+
+Primitive functions like \texttt{set}, \texttt{val}, \texttt{if} and \texttt{while}, which are
+written in \texttt{C} or assembly language now, would be implemented in
+microcode. Plus a few I/O functions for hardware access. \texttt{EVAL} itself
+would be a microcode subroutine.
+
+Only a single heap and a single stack is needed. They grow towards each
+other, and cause garbage collection if they get too close. Heap
+compaction is trivial due to the single cell size.
+
+There would be no assembly-language. The lowest level (above the
+hardware and microcode levels) are s-expressions: The machine language
+is \emph{Lisp}.
+
+ 
+\section{I get a segfault if I \ldots{}}
+\label{sec:faq-i-get-a-segfault-if-i}
+
+
+PicoLisp is a pragmatic language. It doesn't check at runtime for all
+possible error conditions which won't occur during normal usage. Such
+errors are usually detected quickly at the first test run, and checking
+for them after that would just produce runtime overhead.
+
+Catching the segfault signals is also not a good idea, because the Lisp
+heap is most probably be damanged afterwards.
+
+It is recommended, though, to inspect the code periodically with \texttt{lint}.
+
+  
+\section{Where can I ask questions?}
+\label{sec:faq-where-can-i-ask-questions?}
+
+
+The best place is the
+\href{mailto:picolisp@software-lab.de?subject=Subscribe}{PicoLisp Mailing List} (see also
+\href{http://www.mail-archive.com/picolisp@software-lab.de/}{The Mail Archive}), or the IRC \texttt{\#picolisp}
+channel on FreeNode.net.
+

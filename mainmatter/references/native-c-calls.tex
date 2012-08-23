@@ -1,0 +1,733 @@
+\title{Native C Calls}
+\input{mainmatter/authors/alex}
+\maketitle
+
+
+
+\begin{abstract}
+This article describes how to call C functions in shared object files
+(libraries) from PicoLisp, using the built-in \texttt{native} function
+-- possibly with the help of the \texttt{struct} and \texttt{lisp}
+functions. It applies only to the 64-bit version of PicoLisp.
+\end{abstract}
+
+
+\section{Overview}
+\label{sec:native-overview}
+
+\texttt{native} calls a C function in a shared library. It tries to
+
+\begin{enumerate}
+\item
+  find a library by name
+\item
+  find a function by name in the library
+\item
+  convert the function's argument(s) from Lisp to C structures
+\item
+  call the function's C code
+\item
+  convert the function's return value(s) from C to Lisp structures
+\end{enumerate}
+
+The direct return value of \texttt{native} is the Lisp representation of
+the C function's return value. Further values, returned by reference
+from the C function, are available in Lisp variables (symbol values).
+
+\texttt{struct} is a helper function, which can be used to manipulate C
+data structures in memory. It may take a scalar (a numeric
+representation of a C value) to convert it to a Lisp item, or (more
+typically) a pointer to a memory area to build and extract data
+structures. \texttt{lisp} allows you to install callback functions,
+callable from C code, written in Lisp.
+
+In combination, these three functions can interface PicoLisp to almost
+any C function.
+
+The above steps are fully dynamic; \texttt{native} doesn't have (and
+doesn't require) a priory knowledge about the library, the function or
+the involved data. No need to write any glue code, interfaces or include
+files. All functions can even be called interactively from the REPL.
+
+% \begin{center}\rule{3in}{0.4pt}\end{center}
+
+\section{Syntax}
+\label{sec:native-syntax}
+
+The arguments to \texttt{native} are
+
+\begin{enumerate}
+\item
+  a library
+\item
+  a function
+\item
+  a return value specification
+\item
+  optional arguments
+\end{enumerate}
+
+The simplest form is a call to a function without return value and
+without arguments. If we assume a library ``lib.so'', containing a
+function with the prototype
+
+\begin{wideverbatim}
+void fun(void);
+\end{wideverbatim}
+
+then we can call it as
+
+\begin{wideverbatim}
+(native "lib.so" "fun")
+\end{wideverbatim}
+
+% \begin{center}\rule{3in}{0.4pt}\end{center}
+
+\subsection{Libraries}
+\label{sec:native-syntax}
+
+The first argument to \texttt{native} specifies the library. It is
+either the \emph{name} of a library (a symbol), or the \emph{handle} of
+a previously found library (a number).
+
+As a special case, a transient symbol \texttt{"@"} can be passed for the
+library name. It then refers to the current main program (instead of an
+external library), and can be used for standard functions like
+\texttt{"malloc"} or \texttt{"printf"}.
+
+\texttt{native} uses \texttt{dlopen(3)} internally to find and open the
+library, and to obtain the handle. If the name contains a slash ('/'),
+then it is interpreted as a (relative or absolute) pathname. Otherwise,
+the dynamic linker searches for the library according to the system's
+environment and directories. See the man page of \texttt{dlopen(3)} for
+further details.
+
+If called with a symbolic argument, \texttt{native} automatically
+caches the handle of the found library in the value of that symbol.
+The most natural way is to pass the library name as a \emph{transient}
+symbol (\texttt{"lib.so"} above): The initial value of a transient
+symbol is that symbol itself, so that \texttt{native} receives the
+library name upon the first call. After successfully finding and
+opening the library, \texttt{native} stores the handle of that library
+in the value of the passed symbol (\texttt{"lib.so"}). As
+\texttt{native} evaluates its arguments in the normal way, subsequent
+calls within the same transient scope will receive the numeric value
+(the handle), and don't need to open and search the library again.
+
+% \begin{center}\rule{3in}{0.4pt}\end{center}
+
+\subsection{Functions}
+\label{sec:native-functions}
+
+The same rules applies to the second argument, the function. When called
+with a symbol, \texttt{native} stores the function pointer in its value,
+so that subsequent calls evaluate to that pointer, and \texttt{native}
+can directly jump to the function.
+
+\texttt{native} uses \texttt{dlsym(3)} internally to obtain the function
+pointer. See the man page of \texttt{dlsym(3)} for further details.
+
+In most cases a program will call more than one function from a given
+library. If we keep the code within the same transient scope (i.e. in
+the same source file, and not separated by the \texttt{====} function),
+each library will be opened -- and each function searched -- only once.
+
+\begin{wideverbatim}
+(native "lib.so" "fun1")
+(native "lib.so" "fun2")
+(native "lib.so" "fun3")
+\end{wideverbatim}
+
+After \texttt{"fun1"} was called, \texttt{"lib.so"} will be open, and
+won't be re-opened for \texttt{"fun2"} and \texttt{"fun3"}. Consider the
+definition of helper functions:
+
+\begin{wideverbatim}
+(de fun1 ()
+   (native "lib.so" "fun1") )
+
+(de fun2 ()
+   (native "lib.so" "fun2") )
+
+(de fun3 ()
+   (native "lib.so" "fun3") )
+\end{wideverbatim}
+
+After any one of \texttt{fun1}, \texttt{fun2} or \texttt{fun3} was
+called, the symbol \texttt{"lib.so"} will hold the library handle. And
+each function function \texttt{"fun1"}, \texttt{"fun2"} and
+\texttt{"fun3"} will be searched only when called the first time.
+
+Warning: It should be avoided to put more than one library into a single
+transient scope if there is a chance that two different functions with
+the same name will be called in two different libraries. Because of the
+function pointer caching, the second call would otherwise (wrongly) go
+to the first function.
+
+% \begin{center}\rule{3in}{0.4pt}\end{center}
+
+\subsection{Return Value}
+\label{sec:native-return-value}
+
+The (optional) third argument to \texttt{native} specifies the return
+value. A C function can return many types of values, like integer or
+floating point numbers, string pointers, or pointers to structures which
+in turn consist of those types, and even other structures or pointers to
+structures. \texttt{native} tries to cover most of them.
+
+As described in the \emph{result specification},
+the third argument should consist of a pattern which tells
+\texttt{native} how to extract the proper value.
+
+\subsubsection{Primitive Types}
+\label{sec:native-primitive-types}
+
+In the simplest case, the result specification is \texttt{NIL} like in
+the examples so far. This means that either the C function returns
+\texttt{void}, or that we are not interested in the value. The return
+value of \texttt{native} will be \texttt{NIL} in that case.
+
+If the result specification is one of the symbols \texttt{B}, \texttt{I}
+or \texttt{N}, an integer number is returned, by interpreting the result
+as a \texttt{char} (8 bit unsigned byte), \texttt{int} (32 bit signed
+integer), or \texttt{long} number (64 bit signed integer), respectively.
+Other (signed or unsigned numbers, and of different sizes) can be
+produced from these types with logical and arithmetic operations if
+necessary.
+
+If the result specification is the symbol \texttt{C}, the result is
+interpreted as a 16 bit number, and a single-char transient symbol
+(string) is returned.
+
+A specification of \texttt{S} tells \texttt{native} to interpret the
+result as a pointer to a C string (null terminated), and to return a
+transient symbol (string).
+
+If the result specification is a number, it will be used as a scale to
+convert a returned \texttt{double} (if the number is positive) or
+\texttt{float} (if the number is negative) to a scaled fixpoint number.
+
+Examples for function calls, with their corresponding C prototypes:
+
+\begin{wideverbatim}
+(native "lib.so" "fun" 'I)             # int fun(void);
+(native "lib.so" "fun" 'N)             # long fun(void);
+(native "lib.so" "fun" 'N)             # void *fun(void);
+(native "lib.so" "fun" 'S)             # char *fun(void);
+(native "lib.so" "fun" 1.0)            # double fun(void);
+\end{wideverbatim}
+
+\subsubsection{Arrays and Structures}
+\label{sec:native-arrays-and-structures}
+
+If the result specification is a list, it means that the C function
+returned a pointer to an array, or an arbitrary memory structure. The
+specification list should then consist of either the above primitive
+specifications (symbols or numbers), or of cons pairs of a primitive
+specification and a repeat count, to denote arrays of the given type.
+
+Examples for function calls, with their corresponding pseudo C
+prototypes:
+
+\begin{wideverbatim}
+(native "lib.so" "fun" '(I . 8))       # int *fun(void);  // 8 integers
+(native "lib.so" "fun" '(B . 16))      # unsigned char *fun(void);  // 16 bytes
+
+(native "lib.so" "fun" '(I I))         # struct {int i; int j;} *fun(void);
+(native "lib.so" "fun" '(I . 4))       # struct {int i[4];} *fun(void);
+
+(native "lib.so" "fun" '(I (B . 4)))   # struct {
+                                       #    int i;
+                                       #    unsigned char c[4];
+                                       # } *fun(void);
+
+(native "lib.so" "fun"                 # struct {
+   '(((B . 4) I) (S . 12) (N . 8)) )   #    struct {unsigned char c[4]; int i;}
+                                       #    char *names[12];
+                                       #    long num[8];
+                                       # } *fun(void);
+\end{wideverbatim}
+
+If a returned structure has an element which is a \emph{pointer} to some
+other structure (i.e. not an embedded structure like in the last example
+above), this pointer must be first obtained with a \texttt{N} pattern,
+which can then be passed to \texttt{struct} for further extraction.
+
+% \begin{center}\rule{3in}{0.4pt}\end{center}
+
+\subsection{Arguments}
+\label{sec:native-arguments}
+
+The (optional) fourth and following arguments to \texttt{native} specify
+the arguments to the C function.
+
+\subsubsection{Primitive Types}
+\label{sec:native-primitive-types}
+
+Integer arguments (up to 64 bits, signed or unsigned \texttt{char},
+\texttt{short}, \texttt{int} or \texttt{long}) can be passed as they
+are: As numbers.
+
+\begin{wideverbatim}
+(native "lib.so" "fun" NIL 123)        # void fun(int);
+(native "lib.so" "fun" NIL 1 2 3)      # void fun(int, long, short);
+\end{wideverbatim}
+
+String arguments can be specified as symbols. \texttt{native} allocates
+memory for each string (with \texttt{strdup(3)}), passes the pointer to
+the C function, and releases the memory (with \texttt{free(3)}) when
+done.
+
+\begin{wideverbatim}
+(native "lib.so" "fun" NIL "abc")      # void fun(char*);
+(native "lib.so" "fun" NIL 3 "def")    # void fun(int, char*);
+\end{wideverbatim}
+
+Note that the allocated string memory is released \emph{after} the
+return value is extracted. This allows a C function to return the
+argument string pointer, perhaps after modifying the data in-place, and
+receive the new string as the return value (with the \texttt{S}
+specification).
+
+\begin{wideverbatim}
+(native "lib.so" "fun" 'S "abc")       # char *fun(char*);
+\end{wideverbatim}
+
+Also note that specifying \texttt{NIL} as an argument passes an empty
+string (``'', which also reads as \texttt{NIL} in PicoLisp) to the C
+function. Physically, this is a pointer to a NULL-byte, and is not a
+NULL-pointer. Be sure to pass \texttt{0} (the number zero) if a
+NULL-pointer is desired.
+
+Floating point arguments are specified as cons pairs, where the value is
+in the CAR, and the CDR holds the fixpoint scale. If the scale is
+positive, the number is passed as a \texttt{double}, otherwise as a
+\texttt{float}.
+
+\begin{wideverbatim}
+(native "lib.so" "fun" NIL             # void fun(double, float);
+   (12.3 . 1.0) (4.56 . -1.0) )
+\end{wideverbatim}
+
+\subsubsection{Arrays and Structures}
+\label{sec:native-arrays-and-structures}
+
+Composite arguments are specified as nested list structures.
+\texttt{native} allocates memory for each array or structure (with
+\texttt{malloc(3)}), passes the pointer to the C function, and releases
+the memory (with \texttt{free(3)}) when done.
+
+This implies that such an argument can be both an input and an output
+value to a C function (pass by reference).
+
+The CAR of the argument specification can be \texttt{NIL} (then it is an
+input-only argument). Otherwise, it should be a variable which receives
+the returned structure data.
+
+The CADR of the argument specification must be a cons pair with the
+total size of the structure in its CAR. The CDR is ignored for
+input-only arguments, and should contain a
+\emph{result specification} for the output value
+to be stored in the variable.
+
+For example, a minimal case is a function that takes an integer
+reference, and stores the number `123' in that location:
+
+\begin{wideverbatim}
+void fun(int *i) {
+   *i = 123;
+}
+\end{wideverbatim}
+
+We call \texttt{native} with a variable \texttt{X} in the CAR of the
+argument specification, a size of 4 (i.e. \texttt{sizeof(int)}), and
+\texttt{I} for the result specification. The stored value is then
+available in the variable \texttt{X}:
+
+\begin{wideverbatim}
+: (native "lib.so" "fun" NIL '(X (4 . I)))
+-> NIL
+: X
+-> 123
+\end{wideverbatim}
+
+The rest (CDDR) of the argument specification may contain initialization
+data, if the C function expects input values in the structure. It should
+be a list of \emph{initialization items}, optionally
+with a fill-byte value in the CDR of the last cell.
+
+If there are \emph{no} initialization items and just the final fill-bye,
+then the whole buffer is filled with that byte. For example, to pass a
+buffer of 20 bytes, initialized to zero:
+
+\begin{wideverbatim}
+: (native "lib.so" "fun" NIL '(NIL (20) . 0))
+\end{wideverbatim}
+
+A buffer of 20 bytes, with the first 4 bytes initialized to 1, 2, 3, and
+4, and the rest filled with zero:
+
+\begin{wideverbatim}
+: (native "lib.so" "fun" NIL '(NIL (20) 1 2 3 4 . 0))
+\end{wideverbatim}
+
+and the same, where the buffer contents are returned as a list of bytes
+in the variable \texttt{X}:
+
+\begin{wideverbatim}
+: (native "lib.so" "fun" NIL '(X (20 B . 20) 1 2 3 4 . 0))
+\end{wideverbatim}
+
+For a more extensive example, let's use the following definitions:
+
+\begin{wideverbatim}
+typedef struct value {
+   int x, y;
+   double a, b, c;
+   int z;
+   char nm[4];
+} value;
+
+void fun(value *val) {
+   printf("%d %d\n", val->x, val->y);
+   val->x = 3;
+   val->y = 4;
+   strcpy(val->nm, "OK");
+}
+\end{wideverbatim}
+
+We call this function with a structure of 40 bytes, requesting the
+returned data in \texttt{V}, with two integers \texttt{(I . 2)}, three
+doubles \texttt{(100 . 3)} with a scale of 2 (1.0 = 100), another
+integer \texttt{I} and four characters \texttt{(C . 2)}. If the
+structure gets initialized with two integers 7 and 6, three doubles
+0.11, 0.22 and 0.33, and another integer 5 while the rest of the 40
+bytes is cleared to zero
+
+\begin{wideverbatim}
+: (native "lib.so" "fun" NIL
+   '(V (40 (I . 2) (100 . 3) I (C . 4)) -7 -6 (100 11 22 33) -5 . 0) )
+\end{wideverbatim}
+
+then it will print the integers 7 and 6, and \texttt{V} will contain the
+returned list
+
+\begin{wideverbatim}
+((3 4) (11 22 33) 5 ("O" "K" NIL NIL))
+\end{wideverbatim}
+
+i.e. the original integer values 7 and 6 replaced with 3 and 4.
+
+Note that the allocated structure memory is released \emph{after} the
+return value is extracted. This allows a C function to return the
+argument structure pointer, perhaps after modifying the data in-place,
+and receive the new structure as the return value -- instead of (or even
+in addition to) to the direct return via the argument reference.
+
+% \begin{center}\rule{3in}{0.4pt}\end{center}
+
+\section{Memory Management}
+\label{sec:native-memory-management}
+
+The preceding \emph{Arguments} section mentions that
+\texttt{native} implicitly allocates and releases memory for strings,
+arrays and structures.
+
+Technically, this mimics \emph{automatic variables} in C.
+
+For a simple example, let's assume that we want to call \texttt{read(2)}
+directly, to fetch a 4-byte integer from a given file descriptor. This
+could be done with the following C function:
+
+\begin{wideverbatim}
+int read4bytes(int fd) {
+   char buf[4];
+
+   read(fd, buf, 4);
+   return *(int*)buf;
+}
+\end{wideverbatim}
+
+\texttt{buf} is an automatic variable, allocated on the stack, which
+disappears when the function returns. A corresponding \texttt{native}
+call would be:
+
+\begin{wideverbatim}
+(native "@" "read" 'N Fd '(Buf (4 . I)) 4)
+\end{wideverbatim}
+
+The structure argument \texttt{(Buf (4 . I))} says that a space of 4
+bytes should be allocated and passed to \texttt{read}, then an integer
+\texttt{I} returned in the variable \texttt{Buf} (the return value of
+\texttt{native} itself is the number returned by \texttt{read}). The
+memory space is released after that.
+
+(Note that we use \texttt{"@"} for the library here, as \texttt{read}
+resides in the main program.)
+
+Instead of a single integer, we might want a list of four bytes to be
+returned from \texttt{native}:
+
+\begin{wideverbatim}
+(native "@" "read" 'N Fd '(Buf (4 B . 4)) 4)
+\end{wideverbatim}
+
+The difference is that we wrote \texttt{(B . 4)} (a list of 4 bytes)
+instead of \texttt{I} (a single integer) for the \emph{result
+  specification} (see the \emph{Arrays and Structures} section).
+
+Let's see what happens if we extend this example. We'll write the four
+bytes to another file descriptor, after reading them from the first one:
+
+\begin{wideverbatim}
+void copy4bytes(int fd1, int fd2) {
+   char buf[4];
+
+   read(fd1, buf, 4);
+   write(fd2, buf, 4);
+}
+\end{wideverbatim}
+
+Again, \texttt{buf} is an automatic variable. It is passed to both
+\texttt{read} and \texttt{write}. A direct translation would be:
+
+\begin{wideverbatim}
+(native "@" "read" 'N Fd '(Buf (4 B . 4)) 4)
+(native "@" "write" 'N Fd (cons NIL (4) Buf) 4)
+\end{wideverbatim}
+
+This work as expected. \texttt{read} returns a list of four bytes in
+\texttt{Buf}. The call to \texttt{cons} builds the structure
+
+\begin{wideverbatim}
+(NIL (4) 1 2 3 4)
+\end{wideverbatim}
+
+i.e. no return variable, a four-byte memory area, filled with the four
+bytes (assuming that \texttt{read} returned 1, 2, 3 and 4). Then this
+structure is passed to \texttt{write}.
+
+But: This solution induces quite some overhead. The four-byte buffer is
+allocated before the call to \texttt{read} and released after that, then
+allocated and released again for \texttt{write}. Also, the bytes are
+converted to a list to be stored in \texttt{Buf}, then that list is
+extended for the structure argument to \texttt{write}, and converted
+again back to the raw byte array. The data in the list itself are never
+used.
+
+If the above operation is to be used more than once, it is better to
+allocate the buffer manually, use it for both reading and writing, and
+then release it. This also avoids all intermediate list conversions.
+
+\begin{wideverbatim}
+(let Buf (native "@" "malloc" 'N 4) # Allocate memory
+   (native "@" "read" 'N Fd Buf 4)  # (Possibly repeat this several times)
+   (native "@" "write" 'N Fd Buf 4)
+   (native "@" "free" NIL Buf) )    # Release memory
+\end{wideverbatim}
+
+\subsection{Fast Fourier Transform}
+\label{sec:native-fast-fourier-transform}
+
+For a more typical example, we might call the Fast Fourier Transform
+using the library from the \href{http://fftw.org}{FFTW} package. With
+the example code for calculating Complex One-Dimensional DFTs:
+
+\begin{wideverbatim}
+#include <fftw3.h>
+...
+{
+   fftw_complex *in, *out;
+   fftw_plan p;
+   ...
+   in = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * N);
+   out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * N);
+   p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
+   ...
+   fftw_execute(p); /* repeat as needed */
+   ...
+   fftw_destroy_plan(p);
+   fftw_free(in); fftw_free(out);
+}
+\end{wideverbatim}
+
+we can build the following equivalent:
+
+\begin{wideverbatim}
+(load "@lib/math.l")
+
+(de FFTW_FORWARD . -1)
+(de FFTW_ESTIMATE . 64)
+
+(de fft (Lst)
+   (let
+      (Len (length Lst)
+         In (native "libfftw3.so" "fftw_malloc" 'N (* Len 16))
+         Out (native "libfftw3.so" "fftw_malloc" 'N (* Len 16))
+         P (native "libfftw3.so" "fftw_plan_dft_1d" 'N
+            Len In Out FFTW_FORWARD FFTW_ESTIMATE ) )
+      (struct In NIL (cons 1.0 (apply append Lst)))
+      (native "libfftw3.so" "fftw_execute" NIL P)
+      (prog1 (struct Out (make (do Len (link (1.0 . 2)))))
+         (native "libfftw3.so" "fftw_destroy_plan" NIL P)
+         (native "libfftw3.so" "fftw_free" NIL Out)
+         (native "libfftw3.so" "fftw_free" NIL In) ) ) )
+\end{wideverbatim}
+
+This assumes that the argument list \texttt{Lst} is passed as a list of
+complex numbers, each as a list of two numbers for the real and
+imaginary part, like
+
+\begin{wideverbatim}
+(fft '((1.0 0) (1.0 0) (1.0 0) (1.0 0) (0 0) (0 0) (0 0) (0 0)))
+\end{wideverbatim}
+
+The above translation to Lisp is quite straightforward. After the two
+buffers are allocated, and a plan is created, \texttt{struct} is called
+to store the argument list in the \texttt{In} structure as a list of
+double numbers (according to the \texttt{1.0}
+\emph{initialization item}). Then
+\texttt{fftw\_execute} is called, and \texttt{struct} is called again to
+retrieve the result from \texttt{Out} and return it from \texttt{fft}
+via the \texttt{prog1}. Finally, all memory is released.
+
+\subsection{Constant Data}
+\label{sec:native-constant-data}
+
+If such allocated data (strings, arrays or structures passed to
+\texttt{native}) are constant during the lifetime of a program, it makes
+sense to allocate them only once, before their first use. A typical
+candidate is the format string of a \texttt{printf} call. Consider a
+function which prints a floating point number in scientific notation:
+
+\begin{wideverbatim}
+(load "@lib/math.l")
+
+: (de prf (Flt)
+   (native "@" "printf" NIL "%e^J" (cons Flt 1.0)) )
+-> prf
+
+: (prf (exp 12.3))
+2.196960e+05
+\end{wideverbatim}
+
+As we know that the format string \texttt{"\%e\^{}J"} will be converted
+from a Lisp symbol to a C string with \texttt{strdup} -- and then thrown
+away -- on each call to \texttt{prf}, we might as well perform a little
+optimization and delegate this conversion to the program load time:
+
+\begin{wideverbatim}
+: (de prf (Flt)
+   (native "@" "printf" NIL `(native "@" "strdup" 'N "%e^J") (cons Flt 1.0)) )
+-> prf
+
+: (prf (exp 12.3))
+2.196960e+05
+\end{wideverbatim}
+
+If we look at the \texttt{prf} function, we see that it now contains the
+pointer to the allocated string memory:
+
+\begin{wideverbatim}
+: (pp 'prf)
+(de prf (Flt)
+   (native "@" "printf" NIL 24662032 (cons Flt 1000000)) )
+-> prf
+\end{wideverbatim}
+
+This pointer will be used by \texttt{printf} directly, without any
+further conversion or memory management.
+
+% \begin{center}\rule{3in}{0.4pt}\end{center}
+
+\section{Callbacks}
+\label{sec:native-callbacks}
+
+Sometimes it is necessary to do the reverse: Call Lisp code from C code.
+This can be done in two ways -- with certain limitations.
+
+\subsection{Call by Name}
+\label{sec:native-callbacks}
+
+The first way is actually not a
+\href{http://en.wikipedia.org/wiki/Callback\_(computer\_programming)}{callback}
+in the strict sense. It just allows to call a Lisp function with a given
+name.
+
+The limitation is that this function can accept only maximally five
+numeric arguments, and returns a number.
+
+The prerequisite is, of course, that you have access to the C source
+code. To use it from C, insert the following prototype somewhere before
+the first call:
+
+\begin{wideverbatim}
+long lisp(char*,long,long,long,long,long);
+\end{wideverbatim}
+
+Then you can call \texttt{lisp} from C:
+
+\begin{wideverbatim}
+long n = lisp("myLispFun", a, b, 0, 0, 0);
+\end{wideverbatim}
+
+The first argument should be the name of a Lisp function (built-in, or
+defined in Lisp). It is searched for at runtime, so it doesn't need to
+exist at the time the C library is compiled or loaded.
+
+Be sure to pass dummy arguments (e.g. zero) if your function expects
+less than five arguments, to keep the C compiler happy.
+
+This mechanism can generally be used for any type of argument and return
+value (not only \texttt{long}). On the C side, appropriate casts or a
+adapted prototype should be used. It is then up to the called Lisp
+function to prepare and/or extract the proper data with \texttt{struct}
+and memory management operations.
+
+\subsection{Function Pointer}
+\label{sec:native-function-pointer}
+
+This is a true
+\href{http://en.wikipedia.org/wiki/Callback\_(computer\_programming)}{callback}
+mechanism. It uses the Lisp-level function \texttt{lisp} (not to
+confuse with the C-level function with the same name in the previous
+section). No C source code access is required.
+
+\texttt{lisp} returns a function pointer, which can be passed to C
+functions via \texttt{native}. When this function pointer is
+dereferenced and called from the C code, the corresponding Lisp function
+is invoked. Here, too, only five numeric arguments and a numeric return
+value can be used, and other data types must be handled by the Lisp
+function with \texttt{struct} and memory management operations.
+
+Callbacks are often used in user interface libraries, to handle key-,
+mouse- and other events. Examples can be found in
+\texttt{"@lib/openGl.l"}. The following function \texttt{mouseFunc}
+takes a Lisp function, installs it under the tag \texttt{mouseFunc} (any
+other tag would be all right too) as a callback, and passes the
+resulting function pointer to the OpenGL \texttt{glutMouseFunc()}
+function, to set it as a callback for the current window:
+
+\begin{wideverbatim}
+(de mouseFunc (Fun)
+   (native `*GlutLib "glutMouseFunc" NIL (lisp 'mouseFunc Fun)) )
+\end{wideverbatim}
+
+(The global \texttt{*GlutLib} holds the library
+\texttt{"/usr/lib/libglut.so"}. The backquote (\texttt{`}) is important
+here, so that the transient symbol with the library name (and not the
+global \texttt{*GlutLib}) is evaluated by \texttt{native}, resulting in
+the proper library handle at runtime).
+
+A program using OpenGL may then use \texttt{mouseFunc} to install a
+function
+
+\begin{wideverbatim}
+(mouseFunc
+   '((Btn State X Y)
+      (do-something-with Btn State X Y) ) )
+\end{wideverbatim}
+
+so that future clicks into the window will pass the button, state and
+coordinates to that function.
+

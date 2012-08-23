@@ -1,0 +1,189 @@
+\title{Registers and Quoting in PicoLisp}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+\section{Install and Start}
+\label{sec:reg-and-quot-install-and-start}
+
+By now you should have compiled and installed PicoLisp as per the
+\href{http://www.software-lab.de/INSTALL}{install instructions}. We will
+start the \href{http://www.software-lab.de/tut.html#ledit}{interpreter}
+with \textbf{./dbg}. You can create a file and just copy paste the tutorial
+snippets and run them in the interpreter with : (load ``tutorial.l''). To
+rerun you hit ``Esc'' followed by ``k'' to step through prior commands, hit
+``Enter'' when you see the load command.
+
+\section{The car and the cdr}
+\label{sec:reg-and-quot-the-car-and-the-cdr}
+
+As in other Lisps the \texttt{Contents of Address Register (CAR)} and
+\texttt{Contents of Decrement Register (CDR)} is at the
+\href{http://www.software-lab.de/ref.html#cell}{heart of the
+  language}. You might also want to check out
+\href{http://en.wikipedia.org/wiki/Lisp_%28programming_language%29}{Lisp on Wikipedia} before you continue. Also be sure to check out the
+  \href{http://www.software-lab.de/ref.html#conv}{naming conventions}.
+
+Let's try it out:
+
+\begin{wideverbatim}
+(setq *Greeting (list "Hello" "how" "are" "you" "doing?"))
+(prin (car *Greeting))
+\end{wideverbatim}
+
+\texttt{Setq} will put the list created with list in the variable \texttt{Greeting}. Now
+run the above code again but substitute \texttt{car Greeting} with \texttt{cdr Greeting}.
+As you see this is basically the \emph{key =\textgreater  value} system of PHP.
+
+Let's create a simple table/2D array:
+
+\begin{wideverbatim}
+(setq *Fruits 
+      (list 
+       (list "green" "apple" "guava" "avocado") 
+       (list "red" "cherry" "apple")))
+
+(prin (car *Fruits))
+\end{wideverbatim}
+
+As you can see you will get the whole first list from the last \texttt{car}
+command, not really surprising if we follow the logic from the first
+example, this whole list will basically be the key that was represented
+by ``Hello'' above. Try writing
+
+
+\begin{wideverbatim}
+(prin (car (car *Fruits)))
+\end{wideverbatim}
+
+on the last line instead. As you see this will return ``green'' which is
+the \texttt{car} of the first list which in turn is the car of the whole table.
+These double, triple and quadruple car/cdr calls have shortcuts. Try
+
+
+\begin{wideverbatim}
+(prin (caar *Fruits))
+\end{wideverbatim}
+
+instead and you will get the same result. See what you get when you
+try \texttt{cdr}, \texttt{cdar}, \texttt{cadr}, \texttt{caadr} and
+\texttt{cdadr}. Which combinations are they shortcuts for? Take your
+time to learn how these register functions applies to various list
+configurations, the time will be well spent because these things are
+used all the time. They're everywhere.
+
+As it happens there is a shortcut for retrieving the contents of any key
+even if it's in place 100 down the line. Try substituting the last line
+with
+
+\begin{wideverbatim}
+(prin (assoc "red" *Fruits))
+\end{wideverbatim}
+
+instead. As you can see the whole list with red fruits and the key
+(car) is returned. This is normally not what you want when you make a
+call like that, you don't want the key too, only the fruits. But armed
+with our knowledge of how the whole \texttt{car} and \texttt{cdr}
+thing works we quickly do the following:
+
+
+\begin{wideverbatim}
+(prin (cdr (assoc "red" *Fruits)))
+\end{wideverbatim}
+
+That's better, we now get all red fruits, and only the fruits.
+
+\section{Quoting}
+\label{sec:reg-and-quot-quoting}
+
+Try this:
+
+\begin{wideverbatim}
+(set '*Greeting '("Hello" "how" "are" "you" "doing?"))
+(prin (car *Greeting))
+\end{wideverbatim}
+
+Different than above but the result is the same, it's easy to see that
+\texttt{setq var} is just a shortcut for \texttt{set ‘var}. The
+\texttt{‘} is a shortcut for \textbf{quote}, everything quoted is
+taken literally. Variable names inside a quoted list will of course
+not expand into their values - except when when evaluated or passed to
+a family of special functions, \textbf{mapcar} (described below) is
+one of them.
+
+Evaluation example:
+
+\begin{wideverbatim}
+(setq *Prin 'prin)
+(eval '(*Prin "hello"))
+\end{wideverbatim}
+
+However, when not evaluated:
+
+\begin{wideverbatim}
+(setq *Prin 'prin)
+(prin '(*Prin "hello"))
+\end{wideverbatim}
+
+When thinking about quoting it helps - at least for me - to think about
+the turing machine that accepts instructions in the form of these long
+paper strips that you feed into it. On the other side you get the result
+of the computation. When feeding the machine a variable it will of
+course expand into the strip it contains. When quoting though you simply
+feed the machine the raw/literal strip, telling it to treat it as such.
+
+There are however exceptions, some functions work on data by reference,
+just like with the \texttt{\&} in PHP. Let's look at such an example:
+
+\begin{wideverbatim}
+(setq *Greeting '("Hello" "how" "are" "you" "doing?"))
+(prinl (pop '*Greeting))
+(prinl *Greeting)
+\end{wideverbatim}
+
+In this case, as you can see the \texttt{‘} will make the pop function
+treat Greeting as something passed by reference. Quoted lists can of
+course be created dynamically and then be passed around and executed
+to create yet other lists that will be executed in other places in
+absurdity. If done properly you can in this way utilize the power of
+Lisp.
+
+As it happens there is a whole category of functions that will accept a
+function literal (quoted list) and use that function on another list.
+Let's look at a simple example:
+
+\begin{wideverbatim}
+(de getSomething (Lst R)
+    (mapcar '((Element) (R Element)) Lst) )
+
+(setq *Fruits 
+      '(("green" "apple" "guava" "avocado") 
+        ("red" "cherry" "apple")))
+
+(prin (getSomething *Fruits 'car))
+\end{wideverbatim}
+
+In this case we will retrieve all keys, basically the same functionality
+as the PHP function array\_keys. If you do ‘cdr you will instead get the
+values which corresponds to array\_values(). What if you want to get the
+first fruit in each sub-list? Yep you guessed it, just pass ‘cadr
+instead. Pretty dynamic isn't it? If we return to the Turing machine
+analogy, this would constitute using a placeholder on a raw strip that
+will get it's value when it's time to execute the strip/list.
+
+What's happening here is that the function mapcar takes a function
+literal as it's first parameter, the second parameter is the list the
+function literal will operate on, actually mapcar can accept several
+lists and use their contents in the function literal, however in this
+case we just keep it simple. Element will be each element in the list,
+in our case the two sub-lists. The result will be a new list whose
+elements are the results of each operation our function literal
+performs. That is why we get a list with ``green'' and ``red'' in it if we
+pass ‘car to getSomething.
+
+Notice also that there is no return keyword, in PicoLisp (and all Lisps
+I think) all expressions return something, hence no need for a return
+keyword. And the (de… keyword is the same as function in PHP, we simply
+define a new function to be used later. That's all for this time, the
+next tutorial will probably cover more advanced list manipulation
+examples.
+

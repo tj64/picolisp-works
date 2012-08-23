@@ -1,0 +1,184 @@
+\title{Transient Namespaces}
+\input{mainmatter/authors/alex}
+\maketitle
+
+\begin{abstract}
+  This articles is about using use a transient symbol (instead of an
+  internal symbol) for a \textit{temporary} namespace.
+\end{abstract}
+
+
+\section{Introduction}
+\label{sec:transient-namespaces-introduction}
+
+A few days ago I hit upon an interesting concept: Transient Namespaces.
+
+With Transient Namespaces I do not mean namespaces for transient symbols (there
+is always only one single namespace for transient symbols at any moment), but to
+use a transient symbol (instead of an internal symbol) for a \textit{temporary}
+namespace.
+
+It turns out that this makes quite some sense.
+
+\section{Using transient symbols}
+\label{sec:transient-namespaces-using-transient-symbols}
+
+Last week I added an example for the Common-Lisp-style \texttt{DO*} function to
+\underline{macros}\footnote{http://software-lab.de/doc/faq.html\#macros}
+\begin{verbatim}
+   (de do* "Args"
+      (bind (mapcar car (car "Args"))
+         (for "A" (car "Args")
+            (set (car "A") (eval (cadr "A"))) )
+         (until (eval (caadr "Args"))
+            (run (cddr "Args"))
+            (for "A" (car "Args")
+               (and (cddr "A") (set (car "A") (run @))) ) )
+         (run (cdadr "Args")) ) )
+\end{verbatim}
+
+It can be used as
+\begin{verbatim}
+   : (do* ((A 123) (B 'abc) (C 1 (inc C)))
+      ((> C 7) (pack A B))
+      (println C) )
+   1
+   2
+   3
+   4
+   5
+   6
+   7
+   -> "123abc"
+\end{verbatim}
+
+As you see, the above implementation of \texttt{do*} uses \textit{transient} symbols for
+\texttt{"A"} and \texttt{"Args"}. This is the recommended way, to avoid symbol conflicts
+(``captures'' in CL-terminology).
+
+\section{Using internal symbols}
+\label{sec:transient-namespaces-using-internal-symbols}
+
+An implementation with \textit{internal} symbols
+\begin{verbatim}
+   (de do* Args
+      (bind (mapcar car (car Args))
+         (for A (car Args)
+            (set (car A) (eval (cadr A))) )
+         (until (eval (caadr Args))
+            (run (cddr Args))
+            (for A (car Args)
+               (and (cddr A) (set (car A) (run @))) ) )
+         (run (cdadr Args)) ) )
+\end{verbatim}
+
+\textit{looks} better, but gives a wrong result: Because the symbol \texttt{A} is captured,
+the function returns \texttt{"abc"} instead of \texttt{"123abc"}.
+
+So it is wise to use transient symbols, as in the first version.
+
+\section{Using transient namespaces}
+\label{sec:transient-namespaces-using-transient-namespaces}
+
+
+\subsection{Implementation}
+\label{sec:transient-namespaces-implementation}
+
+However, as PicoLisp has namespaces for internal symbols (in the 64-bit version
+since 3.0.7.9, and in Ersatz PicoLisp since 3.1.0.10), there is a third way:
+
+Define \texttt{do*} in a separate namespace, and keep \texttt{A} and \texttt{Args} locally:
+\begin{verbatim}
+   (symbols 'flow 'pico)
+
+   (local Args A)
+
+   (de pico~do* Args
+      (bind (mapcar car (car Args))
+         (for A (car Args)
+            (set (car A) (eval (cadr A))) )
+         (until (eval (caadr Args))
+            (run (cddr Args))
+            (for A (car Args)
+               (and (cddr A) (set (car A) (run @))) ) )
+         (run (cdadr Args)) ) )
+\end{verbatim}
+
+The '\underline{symbols}\footnote{http://software-lab.de/doc/refS.html\#symbols}' call in \texttt{(symbols
+'flow 'pico)} creates a new namespace \texttt{flow} as a copy of the
+\underline{pico}\footnote{http://software-lab.de/doc/refP.html\#pico} namespace, and activates it.
+
+\texttt{(local Args A)} ensures that \texttt{Args} and \texttt{A} are
+\underline{local}\footnote{http://software-lab.de/doc/refL.html\#local} to the new namespace.
+
+\texttt{pico~do*} refers to the existing or newly created symbol \texttt{do*} in the \texttt{pico}
+namespace.
+
+Now, back in the \texttt{pico} namespace (e.g. after hitting EOF), \texttt{do*} is available
+\begin{verbatim}
+   : (pp 'do*)
+   (de do* "Args"
+      (bind (mapcar car (car "Args"))
+         (for "A" (car "Args")
+            (set (car "A") (eval (cadr "A"))) )
+         (until (eval (caadr "Args"))
+            (run (cddr "Args"))
+            (for "A" (car "Args")
+               (and (cddr "A") (set (car "A") (run @))) ) )
+         (run (cdadr "Args")) ) )
+   -> do*
+\end{verbatim}
+
+As you see, \texttt{"Args"} and \texttt{"A"} are transient symbols relative to the \texttt{pico}
+namespace, as the symbols \texttt{Args} and \texttt{A} are internal to the \texttt{flow}
+namespace.
+
+\subsection{Drawback}
+\label{sec:transient-namespaces-drawback}
+
+
+There is just one serious drawback to this approach. The call
+\begin{verbatim}
+   (symbols 'flow 'pico)
+\end{verbatim}
+
+creates the new namespace \texttt{flow} as a copy of \texttt{pico}. For a typical namespace,
+this eats up about 25 kB of memory. If you get into the habit of creating a lot
+of such namespaces, it could become quite wasteful.
+
+Here \textbf{Transient Namespaces} come into play: Just create the namespace as
+\begin{verbatim}
+   (symbols "flow" 'pico)
+\end{verbatim}
+
+i.e. use the transient symbol \texttt{"flow"} instead of the internal symbol \texttt{flow}.
+While it still creates a full copy of \texttt{pico}, it will become garbage as soon as
+\texttt{"flow"} goes out of scope, and no space is wasted in the long term!
+
+Normally, you would create a library for such flow functions in a separate
+source file, containing more than a single function definition. To be sure to
+avoid symbol conflicts also between those function, you may use more than one
+call to \underline{local}\footnote{http://software-lab.de/doc/refL.html\#local} (analog to
+'\underline{====}\footnote{http://software-lab.de/doc/ref\_.html\#====}' calls for separating
+transient symbols):
+\begin{verbatim}
+   (symbols "flow" 'pico)
+
+   (local Args A)
+
+   (de pico~do* Args
+      (bind (mapcar car (car Args))
+         (for A (car Args)
+            (set (car A) (eval (cadr A))) )
+         (until (eval (caadr Args))
+            (run (cddr Args))
+            (for A (car Args)
+               (and (cddr A) (set (car A) (run @))) ) )
+         (run (cdadr Args)) ) )
+
+   (local X Y Prg)
+
+   (do pico~mumble (X Y . Prg)
+      ... )
+   ...
+\end{verbatim}

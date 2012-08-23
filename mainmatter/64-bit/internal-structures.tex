@@ -1,0 +1,380 @@
+\title{Internal Structures 64-bit Version}
+\input{mainmatter/authors/alex}
+\maketitle
+
+\begin{abstract}
+  This article describes the internal structures of the 64-bit
+  PicoLisp Version. 
+\end{abstract}
+
+\section{Primary Data Types}
+\label{sec:internal-structures-primary-data-types}
+
+\begin{wideverbatim}
+cnt   xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxS010
+big   xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxS100
+sym   xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1000
+pair  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx0000
+
+
+
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+
+
+      Bignum
+      |
+      V
+   +-----+-----+
+   | DIG |  |  |
+   +-----+--+--+
+            |
+            V
+         +-----+-----+
+         | DIG |  |  |
+         +-----+--+--+
+                  |
+                  V
+               +-----+-----+
+               | DIG | CNT |
+               +-----+-----+
+
+
+   Pair
+   |
+   V
+   +-----+-----+
+   | CAR | CDR |
+   +-----+-----+
+
+
+         Symbol
+         |
+         V
+   +-----+-----+                                +-----+-----+
+   |  |  | VAL |                                |'cba'|'fed'|
+   +--+--+-----+                                +-----+-----+
+      | tail                                       ^
+      |                                            |
+      V                                            | name
+      +-----+-----+     +-----+-----+     +-----+--+--+
+      |  |  |  ---+---> | KEY |  ---+---> |  |  |  |  |
+      +--+--+-----+     +-----+-----+     +--+--+-----+
+         |                                   |
+         V                                   V
+         +-----+-----+                       +-----+-----+
+         | VAL | KEY |                       | VAL | KEY |
+         +-----+-----+                       +-----+-----+
+
+
+
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+
+   NIL:  /
+         |
+         V
+   +-----+-----+-----+-----+
+   |'LIN'|  /  |  /  |  /  |
+   +-----+--+--+-----+-----+
+
+Symbol tail
+   Internal/Transient
+      0010 Short name
+      0100 Long name
+      0000 Properties
+
+   External
+      1010 Short name
+      1000 Properties
+
+Name final short
+   Internals, Transients
+      0000.xxxxxxx.xxxxxxx.xxxxxxx.xxxxxxx.xxxxxxx.xxxxxxx.xxxxxxx0010
+        60      52      44      36      28      20      12       4
+
+
+   Externals
+      42 bit Object (4 Tera objects)
+      16 bit File (64 K files)
+       2 bit Status
+         Loaded    01........
+         Dirty     10........
+         Deleted   11........
+
+      1+2 Bytes: 1 file, 64K objects                  {177777}
+      1+3 Bytes: 16 files, 1M objects               {O3777777}
+      1+4 Bytes: 256 files, 16M objects           {OO77777777}
+      1+5 Bytes: 256 files, 4G objects         {OO37777777777}
+      1+6 Bytes: 65536 files, 4G objects     {OOOO37777777777}
+      1+8 Bytes: 65536 files, 4T objects  {OOOO77777777777777}
+      (2 + 10 + 8 + 12 + 8 + 20)
+      xx.xxxxxxxxx.xxxxxxx.xxxxxxxxxxx.xxxxxxx.xxxxxxxxxxxxxxxxxxxE010
+        obj       file    obj         file    obj
+                  ^6      ^5      ^4      ^3      ^2
+\end{wideverbatim}
+
+
+
+\section{Heap}
+\label{sec:internal-structures-heap}
+
+
+\begin{wideverbatim}
+Heaps       Avail
+|           |
+|           |  +-----------------------+
+|           |  |                       |
+V           V  |                       V
++-----+-----+--+--+-----+-----+-----+-----+-----+---     ---+-----+
+|           |  |  |     |           |  /  |     |    ...    |  |  |
++-----+-----+-----+-----+-----+-----+-----+-----+---     ---+--+--+
+                                                               |
+                                                               |
+                                                               +----->
+
+\end{wideverbatim}
+
+\section{Stack}
+\label{sec:internal-structures-stack}
+
+
+\begin{wideverbatim}
+
+Saved values:
+                  ^
+                  |
+   +---> LINK ----+
+   |     val1
+   |     val2
+   |     ...
+   |     valN
+   +---- LINK  <-- L
+
+
+Bind frame:
+                  ^
+         Bind     |
+   +---> LINK ----+
+   |     val1
+   |     sym1
+   |     ...
+   |     valN
+   |     symN
+   +---- LINK  <-- L <-- Bind
+         eswp
+
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+
+VarArgs frame:
+                  ^
+         Bind     |
+   +---> LINK ----+
+   |     val1
+   |     sym1
+   |     ...
+   |     valN
+   |     symN
+   +---- LINK <---+  <-- Bind
+         eswp     |
+         Next     |
+         Args     |
+   +---> LINK ----+  <-- Next
+   |     arg1
+   |     ...
+   |     argN        <-- Args
+   +---- LINK  <-- L
+
+
+
+Apply args:
+                  ^
+                  |
+   +---> LINK ----+
+   |     ...
+   |     fun         <-- Y
+   |     arg1
+   |     ...
+   |     argN        <-- Z
+   |     ...
+   +---- LINK <-- L
+
+
+Apply frame:
+                  ^
+         Apply    |
+   +---> LINK ----+
+   |     ...
+   |     valN <-+       (gc)
+   |     zero   |
+   |     NIL    |       (gc)
+   |     carN --+ <-+
+   |     ...        |
+   |     val1 <-+   |   (gc)
+   |     zero   |   |
+   |     cdr1 --|---+   (gc)
+   | +-> car1 --+
+   | +-- cdr            (gc)
+   |     fun         <-- exe
+   +---- LINK  <-- L <-- Apply
+
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+
+Catch frame:
+                  ^
+         X        |
+         Y        |
+         Z        |
+         L        |
+   <III> [env]    |
+   <II>  fin      |
+   <I>   tag      |
+         LINK ----+  <-- Catch
+
+
+I/O frame:
+                  ^
+   <III> put/get  |
+   <II>  pid      |
+   <I>   fd       |
+         LINK ----+  <-- inFrames, outFrames, errFrames, ctlFrames
+
+
+Coroutine frame:
+                  ^
+         X        |
+         Y        |
+         Z        |
+         L        |
+   <III> [env]    |
+   <II>  seg      |
+   <I>   lim      |
+         LINK ----+  <-- co7
+
+
+Stack segment:
+   <-I>  tag      # Tag
+   <-II> stk      # Stack pointer --+
+         [env]    # Environment     |
+         Stack ...                  |
+         X                          |
+         Y                          |
+         Z                          |
+         L  <-----------------------+
+
+
+\end{wideverbatim}
+
+\section{Memory}
+\label{sec:internal-structures-memory}
+
+\begin{wideverbatim}
+inFile:
+   -->   fd       # File descriptor
+   <I>   ix       # Read index
+   <II>  cnt      # Buffer count
+   <III> next     # Next character
+   <IV>  line     # Line number
+   <V>   src      # Source line number
+   <VI>  name     # Filename
+   <VII> buf      # Buffer [BUFSIZ]
+
+outFile:
+   -->   fd       # File descriptor
+   <I>   ix       # Read index
+   <II>  tty      # TTY flag
+   <III> buf      # Buffer [BUFSIZ]
+
+
+child:
+   -->   pid      # Process ID
+   <I>   hear     # Pipe read end
+   <II>  tell     # Pipe write end
+   <III> ofs      # Buffer offset
+   <IV>  cnt      # Buffer count
+   <V>   buf      # Buffer pointer
+
+            +--------------------------+ Mic
+            |
+            |  +-----------------+ Tell         <Child>
+            |  |
+            |  +-----------------> Hear
+<Parent>    |  |
+            |  |
+   Spkr <---+  |
+            |  |
+            |  |
+            |  +-----------------+ Tell
+            |  |
+            |  +-----------------> Hear         <Child>
+            |
+            +--------------------------+ Mic
+
+
+\end{wideverbatim}
+
+\section{Database File}
+\label{sec:internal-structures-database-file}
+
+
+\begin{wideverbatim}
+            +-------------+-+-------------+-+----+
+Block 0:    |   Free       0|   Next       0| << |
+            +-------------+-+-------------+-+----+
+            0               BLK                  2*Blk+1
+
+
+            +-------------+-+
+Free:       |   Link       0|
+            +-------------+-+
+            0
+
+
+            +-------------+-+----
+ID-Block:   |   Link       1| Data
+            +-------------+-+----
+            0              BLK
+
+
+            +-------------+-+----
+EXT-Block:  |   Link       n| Data
+            +-------------+-+----
+            0              BLK
+
+
+dbFile:  # Size VIII (64 bytes)
+   -->   fd       # File descriptor
+   <I>   db       # File number
+   <II>  sh       # Block shift
+   <III> siz      # Block size (64 << sh)
+   <IV>  flgs     # Flags: Lock(0), Dirty(1)
+   <V>   marks    # Mark vector size
+   <VI>  mark     # Mark bit vector
+   <VII> fluse    # Free list use count
+\end{wideverbatim}
+
+\pagebreak{}
+\section{Assumptions}
+\label{sec:internal-structures-assumptions}
+
+\begin{itemize}
+\item 8 bit per byte
+\item 64 bit per word
+\item Stack grows downwards, aligned to 64 bit
+\item Memory access legal also at 4-byte boundaries
+\end{itemize}
+

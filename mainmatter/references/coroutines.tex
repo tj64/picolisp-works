@@ -1,0 +1,337 @@
+\title{Coroutines}
+\input{mainmatter/authors/alex}
+\maketitle
+
+% 16jul12
+% Alexander Burger
+
+% \documentclass[10pt,a4paper]{article}
+% \usepackage{graphicx}
+
+% \textwidth 1.4\textwidth
+% \textheight 1.125\textheight
+% \oddsidemargin 0em
+% \evensidemargin 0em
+% \headsep 0em
+% \parindent 0em
+% \parskip 6pt
+
+% \title{Coroutines}
+% \author{Alexander Burger\\abu@software-lab.de}
+% \date{2011-07-29}
+
+% \begin{document}
+% \maketitle
+
+
+\begin{abstract}
+This article introduces application examples for \emph{coroutines},
+comparing their use and relative efficiency with a possible solution
+via \emph{generators}.     
+\end{abstract}
+
+\section{Introduction}
+\label{sec:coroutines-introduction}
+
+With picoLisp-3.0.3, the 64-bit version of PicoLisp has support for
+\underline{coroutines}\footnote{http://software-lab.de/doc/ref.html\#coroutines}. This article tries
+to show their basic usage.
+
+Assume we need all Pythagorean triples (i.e. all numbers A, B and C, such that
+% A\char942 + B\char942 = C\char942)
+$A + B = C$  with elements between 1 and N. A straightforward way to print
+them is:
+\begin{wideverbatim}
+   (de pythag (N)
+      (for A N
+         (for B (range A N)
+            (for C (range B N)
+               (when (= (+ (* A A) (* B B)) (* C C))
+                  (println (list A B C)) ) ) ) ) )
+\end{wideverbatim}
+
+We get:
+\begin{wideverbatim}
+   : (pythag 20)
+   (3 4 5)
+   (5 12 13)
+   (6 8 10)
+   (8 15 17)
+   (9 12 15)
+   (12 16 20)
+\end{wideverbatim}
+
+However, just printing the triples is not very useful if they were needed in
+various situations for further processing. The lispy way for a general tool is
+passing a \textit{function} to \texttt{pythag} and decide later what to do with the data:
+\begin{wideverbatim}
+   (de pythag (N Fun)
+      (for A N
+         (for B (range A N)
+            (for C (range B N)
+               (when (= (+ (* A A) (* B B)) (* C C))
+                  (Fun (list A B C)) ) ) ) ) )
+\end{wideverbatim}
+
+(note that for a truly general tool, we would write \texttt{Fun} and the local
+variables as transient symbols to avoid conflicts)
+
+Now we can print them again
+\begin{wideverbatim}
+   : (pythag 20 println)
+   (3 4 5)
+   (5 12 13)
+   (6 8 10)
+   (8 15 17)
+   (9 12 15)
+   (12 16 20)
+\end{wideverbatim}
+
+collect them into a list if we like
+\begin{wideverbatim}
+   : (make (pythag 20 link))
+   -> ((3 4 5) (5 12 13) (6 8 10) (8 15 17) (9 12 15) (12 16 20))
+\end{wideverbatim}
+
+or do with them whatever we like.
+
+Still, this method has its limits. What if we need to pass a very large number
+for \texttt{N}, and we want to access the values one by one, perhaps in the course of
+some other involved calculation? Pre-generating the list of all values might not
+be feasible.
+
+\section{Using a Generator}
+\label{sec:coroutines-using-a-generator}
+
+One way to solve this problem is a generator. This function returns the next
+value each time it is called:
+\begin{wideverbatim}
+   (de pythag (N)
+      (job '((A . 1) (B . 1) (C . 0))
+         (loop
+            (when (> (inc 'C) N)
+               (when (> (inc 'B) N)
+                  (setq B (inc 'A)) )
+               (setq C B) )
+            (T (> A N))
+            (T (= (+ (* A A) (* B B)) (* C C))
+               (list A B C) ) ) ) )
+
+   : (pythag 20)
+   -> (3 4 5)
+   : (pythag 20)
+   -> (5 12 13)
+   : (pythag 20)
+   -> (6 8 10)
+   ...
+\end{wideverbatim}
+
+Now we can call it whenever we need a new value. The function encapsulates the
+state of its local variables in a \underline{job}\footnote{http://software-lab.de/doc/refJ.html\#job} environment.
+
+A major disadvantage, however, is that it does not reflect the flow of control.
+The three nested \texttt{for} loops above had to be unfolded and programmed manually.
+This is hard to read, even for this simple case, and may be difficult or
+impossible to program in more complicated cases.
+
+\section{Using a Coroutine}
+\label{sec:coroutines-using-a-coroutine}
+
+A coroutine preserves the local environment, as well as the state of control of
+a function. It may have multiple exit points, and continue execution where it
+left off the last time.
+
+This is done via two new functions: \underline{co}\footnote{http://software-lab.de/doc/refC.html\#co} and \underline{yield}\footnote{http://software-lab.de/doc/refY.html\#yield}.
+\begin{wideverbatim}
+   (de pythag (N)
+      (co 'pythag
+         (for A N
+            (for B (range A N)
+               (for C (range B N)
+                  (when (= (+ (* A A) (* B B)) (* C C))
+                     (yield (list A B C)) ) ) ) ) ) )
+
+   : (pythag 20)
+   -> (3 4 5)
+   : (pythag 20)
+   -> (5 12 13)
+   : (pythag 20)
+   -> (6 8 10)
+   ...
+\end{wideverbatim}
+
+So this is a generator equivalent to the one above, but with cleanly nested
+\texttt{for} loops.
+
+The function \texttt{co} is called with a \textbf{tag} argument, and an executable \textbf{body}
+(a \textit{prg}), similar to \underline{catch}\footnote{http://software-lab.de/doc/refC.html\#catch}. When
+called the first time, a new coroutine for that tag is created, and the body
+gets executed. If called again later, and an existing coroutine for that tag is
+found, execution will continue at the point where it left off last time with
+\texttt{yield}.
+
+\texttt{yield} stops executing the coroutine's body, and immediately returns to the
+caller (or to some other coroutine if desired). When a coroutine is resumed with
+\texttt{co}, it will continue at the point of the last call to \texttt{yield}. If it is
+resumed by a call to \texttt{yield} in another coroutine, the return value of the
+first \texttt{yield} is the value given as an argument to the second \texttt{yield}.
+
+\section{Efficiency}
+\label{sec:coroutines-efficiency}
+
+In terms of memory usage, coroutines are rather expensive, because each of them
+requires its own stack segment. For that reason (and also due to internal
+structures) the maximum number of coroutines in the system is limited to 64.
+
+To my surprise, however, coroutines are quite efficient in terms of runtime
+overhead. Measuring the context switch to and from an empty coroutine (an
+endless loop with just a (yield))
+\begin{wideverbatim}
+   : (bench (do 1000000 (co 'bench (loop (yield)))))
+   0.380 sec
+   -> NIL
+\end{wideverbatim}
+
+shows that it needs just 0.38 / 2 = 0.19 microseconds per switch operation.
+
+This is in the same order of magnitude of a normal function call:
+\begin{wideverbatim}
+   : (bench (do 1000000 ((quote (X Y) (+ X Y)) 3 4)))
+   0.162 sec
+   -> 7
+\end{wideverbatim}
+
+Comparing the implementations of \texttt{pythag} above - as a generator using \texttt{job}
+and a coroutine - shows that the coroutine version is about 10 percent faster.
+
+\section{Inspecting and Stopping Coroutines}
+\label{sec:coroutines-inspecting-and-stopping-coroutines}
+
+The function \underline{stack}\footnote{http://software-lab.de/doc/refS.html\#stack} can be used to
+see which coroutines are currently running (in addition to its primary task of
+setting or returning the current stack segment size).
+
+Let's say we called \texttt{pythag} like in the example above, and then started two
+more coroutines as
+\begin{wideverbatim}
+   : (co "routine1" (yield 1))
+   -> 1
+   : (co "routine2" (yield 2))
+   -> 2
+\end{wideverbatim}
+
+Now there must be three coroutines running. \texttt{stack} returns them:
+\begin{wideverbatim}
+   : (stack)
+   -> ("routine2" "routine1" pythag . 4)
+\end{wideverbatim}
+
+
+When \texttt{co} is called with only a \texttt{tag}, but without a body, the corresponding
+coroutine is stopped.
+\begin{wideverbatim}
+   : (co "routine1")
+   -> T
+   : (co "routine2")
+   -> T
+   : (co 'pythag)
+   -> T
+   : (stack)
+   -> 4
+\end{wideverbatim}
+
+Now all coroutines are gone, and \texttt{stack} returns only the remaining segment
+size (in megabytes).
+
+\section{A Tree Example}
+\label{sec:coroutines-a-tree-example}
+
+A typical example of a situation where a coroutine can simplify things a lot, is
+a recursive algorithm.
+
+For testing, let's generate a balanced binary tree:
+\begin{wideverbatim}
+   (balance '*Tree (range 1 15))
+\end{wideverbatim}
+
+As you may know, you can display it with the
+\underline{view}\footnote{http://software-lab.de/doc/refV.html\#view} function
+\begin{wideverbatim}
+   : (view *Tree T)
+            15
+         14
+            13
+      12
+            11
+         10
+            9
+   8
+            7
+         6
+            5
+      4
+            3
+         2
+            1
+\end{wideverbatim}
+
+It is easy to traverse such a tree, e.g. to print its nodes:
+\begin{wideverbatim}
+   : (de printNodes (Tree)
+      (when Tree
+         (printNodes (cadr Tree))
+         (println (car Tree))
+         (printNodes (cddr Tree)) ) )
+   -> printNodes
+
+   : (printNodes *Tree)
+   1
+   2
+   3
+   4
+   5
+   6
+   7
+   8
+   9
+   10
+   11
+   12
+   13
+   14
+   15
+\end{wideverbatim}
+
+But what if you want to get the nodes returned, one by one, as in a generator
+function? For example, to compare the nodes of two trees and see of they are
+equal? If you think about it, you'll see that it is not trivial.
+
+With a coroutine, it is straightforward. We can write a function that returns
+another node upon each call:
+\begin{wideverbatim}
+   (de nextLeaf (Rt Tree)
+      (co Rt
+         (recur (Tree)
+            (when Tree
+               (recurse (cadr Tree))
+               (yield (car Tree))
+               (recurse (cddr Tree)) ) ) ) )
+\end{wideverbatim}
+
+With that, we can write a function to compare two trees
+\begin{wideverbatim}
+   (de cmpTrees (Tree1 Tree2)
+      (prog1
+         (use (Node1 Node2)
+            (loop
+               (setq
+                  Node1 (nextLeaf "rt1" Tree1)
+                  Node2 (nextLeaf "rt2" Tree2) )
+               (T (nor Node1 Node2) T)
+               (NIL (= Node1 Node2)) ) )
+         (co "rt1")
+         (co "rt2") ) )
+\end{wideverbatim}
+
+The last two calls to \texttt{co} stop the two coroutines, independent of the result.
+

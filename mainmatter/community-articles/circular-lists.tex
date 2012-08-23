@@ -1,0 +1,111 @@
+\title{Wacky Stuff with circular Lists}
+\input{mainmatter/authors/jose}
+\maketitle
+
+
+% 16jul12
+% Thorsten Jolitz
+
+% \documentclass[10pt,a4paper]{article}
+% \usepackage{graphicx}
+
+% \textwidth 1.4\textwidth
+% \textheight 1.125\textheight
+% \oddsidemargin 0em
+% \evensidemargin 0em
+% \headsep 0em
+% \parindent 0em
+% \parskip 6pt
+
+% \title{Wacky stuff with circular lists in PicoLisp}
+% \author{Thorsten Jolitz\\tj@data-driven.de}
+% \date{2011-11-10}
+
+% \begin{document}
+% \maketitle
+
+% \section*{Wacky stuff with circular lists in PicoLisp}
+
+
+\begin{abstract}
+  This article demonstrates and explains \emph{cirular lists} in
+  PicoLisp.
+\end{abstract}
+
+\section{Example 1 with walk-through}
+\label{sec:circ-lists-example-1-with-walk-through}
+
+\texttt{ (and and (@ (min @ 5) (prinl @) (gt0 (dec @)) .)) }
+
+I'm \texttt{eval}. I see a list, look inside, I see a symbol called
+\texttt{'and}. I look at it's \texttt{val}. It's a number, thus a
+function pointer, I call it with the rest of the list unevaluated.
+
+I'm \texttt{doAnd}, I look at the list I was passed, I see a symbol
+called \texttt{'and}, I evaluate it, a number came out, it's not
+\texttt{NIL}, so I shove it in \texttt{@} and look at the next
+\texttt{cadr}. It's a list, I evaluate it, has a symbol called
+\texttt{@} in it's \texttt{car}, that symbol resolves to a number, a
+pointer to \texttt{doAnd}, i call it with the rest of the list
+unchanged.
+
+I'm \texttt{doAnd}, I look at the list I was passed, the first
+argument, evaluating it results in a function call that returns
+\texttt{5}, it's not \texttt{NIL}, so I shove it to \texttt{@} and go
+on. The next element is another list, a call to \texttt{prinl}
+happens, it returned \texttt{5}, it's not \texttt{NIL}, so I shove it
+to \texttt{@} and go on. Look at the next element, a call to
+\texttt{(gt0 (dec @))}, returns \texttt{4}, that is not \texttt{NIL},
+so I shove the \texttt{4} in \texttt{@} and go on. Looking at the next
+\texttt{cadr} I see \texttt{@} again (but I don't realize, because I
+don't know wether a list is circular or not), it evaluates to
+\texttt{4}, so I shove it to \texttt{@} keep going.
+
+\begin{wideverbatim}
+I see (min @ 5) again.........
+ ... 3
+ ... 2
+ ... 1
+ ... (gt0 (dec @)) returns NIL here
+\end{wideverbatim}
+
+
+so I stop evaluating and return \texttt{NIL}
+
+Back in the first \texttt{doAnd}, I see the previous call returned
+\texttt{NIL}, so I stop evaluating right there and return
+\texttt{NIL}.
+
+\section{Example 2 with graphical depiction}
+\label{sec:circ-lists-example-2-with-graphical-depiction}
+
+Example 1 could be written with only one \texttt{'and} using the right
+syntax (and losing part of it's \emph{rube-goldberg} appeal):
+
+\texttt{ (and 5 . ((prinl @) (gt0 (dec @)) .)) }
+
+This is how that \emph{S-expression} should look in memory, I omitted
+the technically correct representation of numbers and symbols to keep
+it simple:
+
+\begin{wideverbatim}
+  
+                      ,-----------------------,
+ +---+---+  +---+---+ '->+---+---+  +---+---+ |
+ |   | ---->|     ------>|   | ---->|   | ----'
+ + | +---+  + | +---+    + | +---+  + | +---+
+   v          v            | ,--------'
+  and         5            | |  +---+---+  +---+---+
+                           | '->|   | ---->|   | / |
+               ,-----------'    + | +---+  + | +---+
+               |                  v          |
+               |                 gt0         |  +---+---+  +---+---+
+               |                             '->|   | ---->|   | / |
+               |   +---+---+  +---+---+         + | +---+  + | +---+
+               '-->|   | ---->|   | / |           v          v
+                   + | +---+  + | +---+          dec         @
+                     v          v
+                   prinl        @
+
+\end{wideverbatim}
+

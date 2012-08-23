@@ -1,0 +1,147 @@
+\message{ !name(editor.tex)}%%%%%%%%%%%%%%%%%%%% file editor.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% sample root file for a complete "contributed book"
+%
+% "contributed book"
+%
+% Copy it to a new file with a new name and
+% use it as a template for your own input.
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\documentclass{svmult}
+
+% choose options for [] as required from the list
+% in the Reference Guide, Sect. 2.2
+
+\usepackage{makeidx}         % allows index generation
+\usepackage{graphicx}        % standard LaTeX graphics tool
+                             % when including figure files
+\usepackage{multicol}        % used for the two-column index
+\usepackage[bottom]{footmisc}% places footnotes at page bottom
+\usepackage{hyperref}
+
+% etc.
+% see the list of further useful packages
+% in the Reference Guide, Sects. 2.3, 3.1-3.3
+
+\makeindex             % used for the subject index
+                       % please use the style sprmidx.sty with
+                       % your makeindex program
+
+
+\newenvironment{verbatimx}{%
+
+}{%
+
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\message{ !name(editor.tex) !offset(-3) }
+
+
+
+
+\frontmatter%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\include{frontmatter/dedic}
+\include{frontmatter/pref}
+
+\tableofcontents
+
+\include{frontmatter/cblist}
+
+\mainmatter%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\include{mainmatter/parts/concepts}
+\include{mainmatter/concepts/radical-approach}
+\include{mainmatter/concepts/unifying-language}
+
+\include{mainmatter/parts/references}
+\include{mainmatter/references/reference-manual}
+\include{mainmatter/references/equivalence-code-data}
+\include{mainmatter/references/first-class-environments}
+\include{mainmatter/references/quote}
+\include{mainmatter/references/dual-nature-nil}
+\include{mainmatter/references/array-abstinence}
+\include{mainmatter/references/coroutines}
+\include{mainmatter/references/native-c-calls}
+\include{mainmatter/references/select-predicate}
+\include{mainmatter/references/using-edit}
+\include{mainmatter/references/bash-completion}
+\include{mainmatter/references/need-for-speed}
+\include{mainmatter/references/gui-scripting}
+\include{mainmatter/references/man-page}
+\include{mainmatter/references/readme}
+\include{mainmatter/references/install}
+
+\include{mainmatter/parts/community-articles}
+\include{mainmatter/community-articles/vizreader-word-index}
+\include{mainmatter/community-articles/asynchronous-programming}
+\include{mainmatter/community-articles/picolisp-ticker}
+\include{mainmatter/community-articles/uses-of-at}
+\include{mainmatter/community-articles/circular-lists}
+\include{mainmatter/community-articles/speedtest-picolisp-vs-elisp}
+
+
+\include{mainmatter/parts/tutorials}
+\include{mainmatter/tutorials/picolisp-tutorial}
+\include{mainmatter/tutorials/application-development}
+
+\include{mainmatter/parts/community-tutorials}
+\include{mainmatter/community-tutorials/first-glance}
+\include{mainmatter/community-tutorials/registers-and-quoting}
+\include{mainmatter/community-tutorials/working-with-tables}
+\include{mainmatter/community-tutorials/simple-oo}
+\include{mainmatter/community-tutorials/more-oo}
+\include{mainmatter/community-tutorials/simple-oodb}
+\include{mainmatter/community-tutorials/more-oodb}
+\include{mainmatter/community-tutorials/advanced-oodb}
+\include{mainmatter/community-tutorials/registration-form}
+\include{mainmatter/community-tutorials/explicit-scope-resolution}
+\include{mainmatter/community-tutorials/pilog-solve}
+\include{mainmatter/community-tutorials/picolisp-json}
+\include{mainmatter/community-tutorials/picolisp-json-jscript}
+\include{mainmatter/community-tutorials/factorials-permutations-recursion}
+\include{mainmatter/community-tutorials/prolog-dating-aid}
+\include{mainmatter/community-tutorials/jquery-picolisp}
+\include{mainmatter/community-tutorials/calling-ruby-scripts}
+
+\include{mainmatter/parts/faq}
+\include{mainmatter/faq/faq}
+
+\include{mainmatter/parts/mail-archive}
+\include{mainmatter/mail-archive/mail-archive}
+
+\include{mainmatter/parts/64-bit}
+\include{mainmatter/64-bit/readme-64bit}
+\include{mainmatter/64-bit/generic-vm-assembler}
+\include{mainmatter/64-bit/internal-structures}
+
+\include{mainmatter/parts/ersatz}
+\include{mainmatter/ersatz/readme-ersatz}
+\include{mainmatter/ersatz/ersatzlisp-java-reflection-api}
+
+
+
+\backmatter%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+\appendix
+\include{backmatter/function-reference/function-reference}
+\include{backmatter/rosettacode/rosettacode1}
+% \include{backmatter/appendix}
+\printindex
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\end{document}
+
+
+
+
+
+
+\message{ !name(editor.tex) !offset(-147) }

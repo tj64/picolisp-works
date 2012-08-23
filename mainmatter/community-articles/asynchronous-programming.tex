@@ -1,0 +1,163 @@
+\title{Asynchronous Programming in PicoLisp}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+% 16jul12
+% Alexander Burger
+
+% \documentclass[10pt,a4paper]{article}
+% \usepackage{graphicx}
+
+% \textwidth 1.4\textwidth
+% \textheight 1.125\textheight
+% \oddsidemargin 0em
+% \evensidemargin 0em
+% \headsep 0em
+% \parindent 0em
+% \parskip 6pt
+
+% \title{Multiple asynchronous HTTP POSTs and 'call' versus 'in' - a word of warning}
+% \author{Henrik Sarvell\\hsarvell@gmail.com}
+% \date{2011-07-29}
+
+% \begin{document}
+% \maketitle
+
+
+\section{Introduction}
+\label{sec:bla}
+
+If you've been using PicoLisp for some time doing nitty gritty stuff
+like interfacing with such horrible things as PHP and other
+abominations you can probably infer from the headline that the pitfall
+here is quite trivial. However, it's the journey that is the important
+part, not the somewhat anticlimactic end to this whole adventure.
+Having said that, let's get to it.
+
+% \section{Multiple asynchronous HTTP POSTs and 'call' versus 'in' - a
+%   word of warning}
+% \label{sec:async-program}
+
+\section{Asynchronous Evaluation in PicoLisp}
+\label{sec:bal}
+
+In PicoLisp there is a clever way of asynchronous evaluation, it can
+be useful if you:
+
+\begin{enumerate}
+\item Have a very computationally heavy problem, you fork the
+  execution to utilize multiple cores and all that cheap RAM.
+\item Need to query X services and don't care to wait for each call to
+  finish before making the next one.
+\end{enumerate}
+
+This ``strategy'' involves
+
+\underline{later}\footnote{http://software-lab.de/doc/refL.html\#later}
+and
+\underline{wait}\footnote{http://software-lab.de/doc/refW.html\#wait},
+\underline{see documents for
+  later}\footnote{http://software-lab.de/doc/refL.html\#later} in
+particular.
+
+My interest is web development so \#2 is standard for me and up until
+now I've used
+\underline{sockets}\footnote{http://software-lab.de/doc/refC.html\#connect}
+in combination with
+\underline{pr}\footnote{http://software-lab.de/doc/refP.html\#pr} and
+\underline{rd}\footnote{http://software-lab.de/doc/refR.html\#rd}. The
+``standard'' PicoLisp way to do these things if you will.
+
+\section{HTTP only}
+\label{sec:bla}
+
+However, at the moment I'm working on something new and I want to work
+solely with HTTP, not with PLIO, despite it being faster/more
+efficient than HTTP. Let's just say that HTTP is the only allowed way
+of communication in my ``spec''.
+
+\subsection{Using \texttt{call}}
+\label{sec:bla}
+
+So I went happily on my way coding up all this communication with the
+help of \texttt{CURL} and the
+\underline{call}\footnote{http://software-lab.de/doc/refC.html\#call}
+function.
+
+Let's have a code listing:
+
+\begin{wideverbatim}
+(de callAll (Func Data)
+   (let Result
+      (make
+         (for S (collect 'id '+Server)
+            (later (chain (cons "void"))
+               (list (; S id) (callOne Func Data S)))))
+      (wait 30000 (not (memq "void" Result)))
+      Result))
+\end{wideverbatim}
+
+Here you can see the core of the strategy, we loop through a list of
+nodes (\texttt{+Server}) to query each and every for some arbitrary
+data. What you don't see in the above listing is the contents of
+\texttt{callOne} but it doesn't matter, we'll get to that soon enough.
+In essence what we're doing here is getting all the nodes in my
+massive distributed database (there are at the time of this writing
+two of them running on my laptop but whatever).
+
+These nodes might be more or less busy doing other stuff so response
+times might vary and can you imagine if the first one takes 10 seconds
+to reply and the second one takes 5 seconds? In a non-asynch world
+that would add up to a grand total of 15 seconds for the query.
+
+Luckily we use later and wait to avoid that and query them in parallel
+for a grand total of 10 seconds. What's happening here is that we add
+the results to a list, each entry in the list will start with
+``void'', then we
+\underline{fork}\footnote{http://software-lab.de/doc/refP.html\#pipe}.
+Each fork will return a result (or not but we'll get to that very very
+soon).
+
+The second (list ... ) argument there is supposed to return a list
+with the \texttt{id} of the node in the car and the result of the
+query in the cdr. If a node times out one or more positions in the
+list will still be ``void'' instead of something useful.
+
+Finally the wait call will wait for 30 seconds or until all nodes have
+returned something (i.e not timed out). After that wait we return the
+list which I expected would look something like this for my specific
+case (counting the objects in each node): ((1 ``1``) (2 ``0'')).
+
+The problem was, the result didn't look like that, it looked more like
+\texttt{(NIL NIL)}. I was using call like this: 
+
+\begin{wideverbatim}
+(call 'curl '-m 30 '-d
+   ``key1=value1\&key2=value2`` ''http://localhost:8081/@exec`` )
+\end{wideverbatim}
+
+The reason for that is ye old copy paste problem, not even that in
+this case actually. Just checking code from \underline{an old
+  project}\footnote{http://vizreader.com} and seeing call in action
+without realizing that in that case it was actually used correctly (I
+wasn't interested in the returned content).
+
+\subsection{Using \texttt{in}}
+\label{sec:bla}
+
+Yep, \texttt{call} returns \texttt{T}, not the actual result which
+makes it useless in this case. I now use \texttt{in}, like this: 
+
+\begin{wideverbatim}
+(in (list ``curl'' ``-m`` Timeout ''-d`` ''key1=value1\&key2=value2``
+       ''http://localhost:8081/@exec`` ) (till NIL T) ) 
+\end{wideverbatim}
+
+and all is well.
+
+So now you don't have make the same mistake and spend two hours of
+your life before you actually RTFM. However, by now you should've
+realized that asynchronous logic can be indispensible when you don't
+want to wait for too long for something good.
+
+

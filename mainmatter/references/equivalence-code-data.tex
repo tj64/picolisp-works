@@ -1,0 +1,127 @@
+\title{The Equivalence of Code and Data}
+\input{mainmatter/authors/alex}
+\maketitle
+
+% % 16jul12
+% % Alexander Burger
+
+% \documentclass[10pt,a4paper]{article}
+% \usepackage{graphicx}
+
+% \textwidth 1.4\textwidth
+% \textheight 1.125\textheight
+% \oddsidemargin 0em
+% \evensidemargin 0em
+% \headsep 0em
+% \parindent 0em
+% \parskip 6pt
+
+% \title{The Equivalence of Code and Data}
+% \author{Alexander Burger\\abu@software-lab.de}
+% \date{2011-07-29}
+
+% \begin{document}
+% \maketitle
+
+\begin{abstract}
+  This article demonstrates how the \emph{equivalence of code and
+    data}, as a powerful abstraction instrument, supports the
+  ``locality principle of structure, content and behavior'' in PicoLisp.
+\end{abstract}
+
+\section{The Equivalence of Code and Data}
+\label{sec:equiv-equivalence-code-data}
+
+Why does PicoLisp make so much fuss about that equivalence of code and data?
+Answer: Because it is such a powerful abstraction instrument! It supports the
+``locality principle of structure, content and behavior''.
+
+Let me try to explain this using a GUI example, though the same principle also
+applies to most other libraries and applications. Take a simple GUI page:
+\begin{wideverbatim}
+   (action
+      (html 0 "Increment" "lib.css" NIL
+         (form NIL
+            (gui '(+Var +NumField) '*Num 9)
+            (gui '(+JS +Button) "+" '(inc '*Num)) ) ) )
+\end{wideverbatim}
+
+This page shows two components, a numeric input field and a button labeled ``+``.
+You can either enter a value into that field, or increment its value with the
+button.
+
+The page has a \textit{structure}, namely a HTML body containing a form, which in turn
+contains the two components. It has \textit{content}, the numeric value shown in the
+field. And it has \textit{behavior}, as the numeric field handles string conversion
+and error checking, and the button increments the number.
+
+Note that a fourth attribute of the page, the \textit{layout and style}, is not
+discussed here. It is maintained separately in the CSS file.
+
+The three attributes structure, content and behavior, however, cannot be
+separated. This may be contrary to some schools of thought, which advocate a
+separation of structure and content, and behavior anyway. But obviously the HTML
+structure also holds content like the ``Increment'' page title or the ``+`` button
+label. And this content might also be subject to behavior, for example the
+button label may change dynamically:
+\begin{wideverbatim}
+   (gui '(+JS +Button)
+      (if *VerboseDisplay "Increment" "+")
+      '(inc '*Num) )
+\end{wideverbatim}
+
+Or the button may prompt a confirmation dialog to the user:
+\begin{wideverbatim}
+   (gui '(+JS +Button) "+"
+      '(ask "Increment value?"
+         (inc '*Num) ) )
+\end{wideverbatim}
+
+The equivalence of code and data makes the development of functions like
+\texttt{html}, \texttt{form}, \texttt{gui} or \texttt{ask} particularly simple. The list
+\begin{wideverbatim}
+   (ask "Increment value?" (inc '*Num))
+\end{wideverbatim}
+
+is \textit{data} for the \texttt{gui} function. \texttt{gui} constructs a component of the class
+\texttt{+Button}, and simply stows away that list into the new component. Later, when
+the button is pressed, it is executed. It is just that simple.
+
+\texttt{gui} itself doesn't understand anything about buttons and what they do with
+these arguments. It is all data. From the view of the button, however, that list
+is a piece of code, to be executed when the button is pressed.
+
+Later, when \texttt{ask} is executed, the situation is similar. A dialog is shown
+which displays the question ``Increment value?'', and a ``Yes'' and a ``No'' button.
+The ``Yes'' button receives the expression \texttt{(inc '*Num)}, to increment the number
+when pressed.
+
+The example can be modified, to operate on database entities instead. Instead of
+connecting the numeric field to a variable (with the \texttt{+Var} prefix class), we
+connect it to the \texttt{count} property of the database object, and instead of
+incrementing the variable, the button increments that object's count attribute:
+\begin{wideverbatim}
+   (gui '(+E/R +NumField) '(count : home obj) 9)
+   (gui '(+JS +Button) "+" '(inc!> (: home obj) 'count))
+\end{wideverbatim}
+
+No need to write some separate database ``select'' or ``update'' functionality! It
+is all in a single place.
+
+This shows how easily any kind of application logic can be implemented using
+this style. In a typical application hundreds or thousands of such components
+are put together, so it is essential that this can be done with as little noise
+and redundancy as possible.
+
+This becomes especially evident if you compare this style with the GUI and
+application strategies of other languages, for example in the RosettaCode
+tasks
+\underline{GUI component interaction}\footnote{http://rosettacode.org/wiki/GUI\_component\_interaction\#PicoLisp}
+and
+\underline{GUI enabling/disabling of controls}\footnote{http://rosettacode.org/wiki/GUI\_enabling/disabling\_of\_controls\#PicoLisp}.
+
+In other environments, you usually end up defining constants, components and
+functions in separate locations. This is the opposite of what PicoLisp
+advocates, the ``locality principle of structure, content and behavior''.
+
+

@@ -1,0 +1,230 @@
+\title{More OO in PicoLisp}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+\section{Simple single inheritance}
+\label{sec:more-oo}
+
+Let's first look at a simple single inheritance example:
+
+\begin{wideverbatim}
+(class +Species)
+
+(dm T (Species)
+    (=: species Species))
+
+(class +Person +Species)
+
+(dm T (Age Name)
+    (=: age Age)
+    (=: name Name)
+    (super "H. sapiens"))
+
+(setq *John (new '(+Person) 65 'John))
+
+(prin (get *John 'species))
+\end{wideverbatim}
+
+Nothing really surprising here, the hierarchy is set from left to
+right in the class definition, that's why \texttt{+Person} comes
+before \texttt{+Species}: \texttt{(class +Person +Species)}.
+
+\begin{wideverbatim}
+(class +Animal +Species)
+
+(dm T (Age Name . @)
+    (=: age Age)
+    (=: name Name)
+    (super (car (rest))))
+
+(setq *John (new '(+Animal) 25 'John "G. gorilla"))
+
+(prin (get *John 'species))
+\end{wideverbatim}
+
+So John is now a gorilla instead. It's starting to get interesting,
+the above way of doing the argument list will enable us to pass a
+variable amount of arguments, the ones ending up in the \texttt{@} can
+be retrieved with \textbf{rest}, in this case it's the third one, ``G.
+gorilla''. Note that rest will retrieve a list, even if there is only
+one argument left in it, hence the use of car in this case to get only
+the first element. In this case ``G. gorilla'' will be passed to the
+constructor of \texttt{+Species} through \textbf{super}.
+
+There is however at better way of doing the argument handling than
+\texttt{(car (rest))}:
+
+\begin{wideverbatim}
+(class +Species)
+
+(dm T (Species . @)
+    (=: species Species)
+    (=: description (next)))
+
+(class +Animal +Species)
+
+(dm T (Age Name . @)
+    (=: age Age)
+    (=: name Name)
+    (super (next) (car (rest))))
+
+(setq *John (new '(+Animal) 25 'John "G. gorilla" 
+      "Big leaf eating primate"))
+
+(prin (get *John 'description))
+\end{wideverbatim}
+
+That's right, \textbf{next} will retrieve the next value from
+\textbf{rest} and in the process remove the value by reference as
+demonstrated by the fact that \texttt{(car (rest))} gives the proper
+result in this case. You would however want to use just another
+\texttt{(next)} instead in a situation like the one above.
+
+
+\section{Multiple inheritance}
+\label{sec:more-oo}
+
+Let's take a look at a more complex ``horizontal'' example, for
+another example check out the
+\href{http://www.software-lab.de/tut.html#oop}{OOP section} in Alex's
+\href{http://www.software-lab.de/tut.html}{Pico Lisp tutorial}. I
+found it helpful, even in the very beginning.
+
+\begin{wideverbatim}
+(class +Species)
+(dm T (@)
+    (=: species (next)))
+
+(dm show> ()
+    (pack " Species:" (: species)))
+
+(class +Body)
+(dm T (Age Weight Height . @)
+    (=: age Age)
+    (=: weight Weight)
+    (=: height Height)
+    (pass extra))
+
+(dm show> ()
+    (pack " Age:" (: age) " Weight(kg):
+     " (: weight) " Height(cm):" (: height) (extra)))
+
+(class +Person)
+(dm T (Name Occupation . @)
+    (=: occupation Occupation)
+    (=: name Name)
+    (pass extra))
+
+(dm show> ()
+    (pack " Name:" (: name) " Occupation:" (: occupation) (extra)))
+
+(setq *John (new '(+Person +Body +Species) 
+      "John" "Teacher" 65 85 180 "H. Sapiens"))
+
+(prin (show> *John))
+\end{wideverbatim}
+
+In this case John is the combination of three different classes at once
+and the way to call the next function in the horizontal hierarchy (from
+left to right) is to use \textbf{extra}. In this case \textbf{pass} is a shortcut for
+sending \textbf{rest} to the next constructor. Let's introduce a new class:
+
+
+\begin{wideverbatim}
+(class +Location)
+(dm T (Location . @)
+    (=: location Location)
+    (pass extra))
+
+(dm show> ()
+    (pack " Location:" (: location) (extra)))
+    
+(setq *John (new '(+Person +Body +Location +Species)
+ "John" "Teacher" 65 85 180 "New York" "H. Sapiens"))
+
+(prin (show> *John))
+\end{wideverbatim}
+
+In this case the two middle classes \texttt{+Body} and
+\texttt{+Location} are interchangeable:
+
+
+\begin{wideverbatim}
+(setq *John (new '(+Person +Location +Body +Species)
+ "John" "Teacher" "New York" 65 85 180 "H. Sapiens"))
+\end{wideverbatim}
+
+This is basically the same thing since it's not a hierarchy in the
+traditional sense, the two middle classes do not have to know what is
+behind and after in the chain.
+
+This way of using chained relations is important, it is used for
+instance in the GUI framework to validate forms by simply having a
+\texttt{chk>} function that uses \texttt{(pass extra)} to walk the
+chain, each check is of course unique for each input type,
+\texttt{+TextField} and \texttt{+NumField} are two examples.
+
+
+\section{Class extension on demand}
+\label{sec:more-oo}
+
+Classes can be extended on demand:
+
+\begin{wideverbatim}
+(setq *John (new '(+Person +Body +Location +Species) 
+"John" "Teacher" 65 85 180 "New York" "H. Sapiens"))
+
+(extend +Body)
+(dm bmi> ()
+    (*/ (: weight) 10000 (** (: height) 2) ))
+
+(prin (bmi> *John))
+\end{wideverbatim}
+
+The \texttt{**/*} function is necessary to handle cases like this in
+order to get the proper result by first multiplying the weight with
+10000 and then dividing that result with 180*180. PicoLisp doesn't
+handle intermediate floating point numbers automatically. If you
+wanted an output with one decimal for instance you could do:
+
+
+\begin{wideverbatim}
+(dm bmi> ()
+    (format (*/ (: weight) 100000 (** (: height) 2)) 1))
+\end{wideverbatim}
+
+In this case \textbf{format} will take the number 262 and turn it into 26.1. A
+more on the fly method of accomplishing the above would be:
+
+\begin{wideverbatim}
+(setq *John (new '(+Person +Body +Location +Species) 
+"John" "Teacher" 65 85 180 "New York" "H. Sapiens"))
+
+(push *John 
+      '(bmi> () (format (*/ (: weight) 100000 (** (: height) 2)) 1)))
+
+(prin (bmi> *John))
+\end{wideverbatim}
+
+Or maybe the \texttt{bmi>} method is already part of some old class in
+some library and now our program discovers that John needs that class
+too:
+
+\begin{wideverbatim}
+(class +WeightHandler)
+(dm bmi> ()
+    (format (*/ (: weight) 100000 (** (: height) 2)) 1))
+
+(setq *John (new '(+Person +Body +Location +Species) 
+"John" "Teacher" 65 85 180 "New York" "H. Sapiens"))
+
+(unless (method 'bmi> *John) (push *John '+WeightHandler))
+
+(prin (bmi> *John))
+\end{wideverbatim}
+
+In this case \textbf{method} will return \texttt{NIL} if John doesn't
+already have the ability to calculate his BMI, in that case we simply
+push the \texttt{WeightHandler} class in front of his other classes.
+
+I don't think I've ever experienced a more flexible object system.

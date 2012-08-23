@@ -1,0 +1,2629 @@
+\title{A PicoLisp Tutorial}
+\input{mainmatter/authors/alex}
+\maketitle
+
+
+\begin{abstract}
+  This article demonstrates some aspects of the PicoLisp system in
+  detail and example. For a general description of the PicoLisp kernel
+  please look at the \emph{PicoLisp Reference}.
+
+  This is not a Lisp tutorial, as it assumes some basic knowledge of
+  programming, Lisp, and even PicoLisp. Please read these sections in
+  the \emph{PicoLisp Reference} before coming back here:
+  \emph{Introduction} and \emph{The PicoLisp Machine}. This tutorial
+  concentrates on the specificities of PicoLisp, and its differences
+  with other Lisp dialects.
+\end{abstract}
+
+\section{Now let's start}
+\label{sec:tut-now-lets-start}
+
+If not stated otherwise, all examples assume that PicoLisp was started
+from a global installation (see \href{ref.html\#inst}{Installation})
+from the shell prompt as
+
+\begin{verbatim}
+$ pil +
+:
+\end{verbatim}
+
+It loads the PicoLisp base system and the debugging environment, and
+waits for you to enter input lines at the interpreter prompt
+(\texttt{:}). You can terminate the interpreter and return to the shell
+at any time, by either hitting the \texttt{Ctrl-D} key, or by executing
+the function \texttt{(bye)}.
+
+Please note that special handling is done during character input. This
+one is incompatible with \texttt{rlwrap} for example but is more
+powerful.
+
+\begin{itemize}
+\item
+  \texttt{vi}-like command-line editing (typos fixes and history with
+  ESC, \texttt{h}, \texttt{j}, \texttt{k} and \texttt{l} but not
+  arrows),
+\item
+  auto-formating (underlined) of double-quoted strings (don't try and
+  struggle to make \texttt{"} appear).
+\end{itemize}
+
+If you prefer to use Emacs, please use the picolisp-mode bundled in
+``@lib/el''.
+
+If you feel that you absolutely have to use an IDE, \texttt{rlwrap} or
+another input front-end, please remove the entry ``@lib/led.l'' from
+``lib.l'' and ``dbg.l''. Note that in this case, however, you will not
+have the TAB symbol completion feature available during command line
+editing.
+
+\section{Command Line Editing}
+\label{sec:tut-command-line-editing}
+
+PicoLisp permanently reads input from the current input channel (i.e.
+the console in interactive mode), evaluates it, and prints the result to
+the current output channel. This is called a ``read-eval-print-loop''
+(REPL).
+
+\subsection{VI-like editing}
+\label{sec:tut-vi-like-editing}
+
+
+It is very helpful - though not absolutely necessary - when you know how
+to use the \texttt{vi} editor.
+
+To alleviate the task of manual line input, a command line editor is
+provided which is similar to (though much simpler than) the \texttt{readline}
+feature of the \texttt{bash} shell. Only a subset of the \texttt{vi} mode is
+supported, which is restricted to single-key commands (the ``real'' \texttt{vi}
+supports multi-key commands and the modification of most commands with
+count prefixes). It is loaded at startup in debug mode, you find its
+source in ``lib/led.l''.
+
+You can enter lines in the normal way, correcting mistypes with the
+BACKSPACE key, and terminating them with the ENTER key. This is the
+\emph{Insert Mode}.
+
+If you hit ESC, you get into \emph{Command Mode}. Now you can navigate
+horizontally in the current input line, or vertically in the history of
+previously entered lines, with key commands borrowed from the \texttt{vi}
+editor (only \texttt{h}, \texttt{j}, \texttt{k} and \texttt{l} and not arrows). Note, however, that
+there is always only a single line visible.
+
+Let's say you did some calculation
+
+
+\begin{wideverbatim}
+: (* (+ 2 3) (- 7 2))
+-> 25
+:
+\end{wideverbatim}
+
+If you want to repeat a modified version of this command, using \texttt{8}
+instead of \texttt{7}, you don't have to re-type the whole command, but type
+
+\begin{itemize}
+\item ESC to get into \emph{Command Mode}
+\item \texttt{k} to get one line ``up''
+\item \texttt{f} and \texttt{7} to ``find'' the character \texttt{7}
+\item \texttt{r} and \texttt{8} to ``replace'' with \texttt{8}
+\end{itemize}
+
+Then you hit ENTER to execute the modified line. Instead of jumping to
+the \texttt{7} with the ``find'' command, you may also type \texttt{l} (move ``right'')
+repeatedly till you reach the correct position.
+
+The key commands in the \emph{Command Mode} are listed below. Some commands
+change the mode back to \emph{Insert Mode} as indicated in parentheses.
+Deleting or changing a ``word'' take either the current atom (number or
+symbol), or a whole expression when the cursor is at a left parenthesis.
+
+\begin{itemize}
+\item \texttt{k} - Go up one line
+\item \texttt{j} - Go down one line
+\item \texttt{l} - Go right one character
+\item \texttt{h} - Go left one character
+\item \texttt{w} - Go right one word
+\item \texttt{b} - Go back (left) one word
+\item \texttt{0} - Go to the beginning of the line
+\item \texttt{\$} - Go to the end of the line
+\item \texttt{i} - Enter \emph{Insert Mode} at the cursor position
+\item \texttt{a} - Append (\emph{Insert Mode}) after the cursor position
+\item \texttt{A} - Append (\emph{Insert Mode}) at the end of the line
+\item \texttt{I} - Insert (\emph{Insert Mode}) at the beginning of the line
+\item \texttt{x} - Delete the character at the cursor position
+\item \texttt{X} - Delete the character left of the cursor position
+\item \texttt{r} - Replace the character at the cursor position with the next key
+\item \texttt{s} - Substitute the character at the cursor position (\emph{Insert Mode})
+\item \texttt{S} - Substitute the whole line (\emph{Insert Mode})
+\item \texttt{d} - Delete the word at the cursor position (\emph{Insert Mode})
+\item \texttt{D} - Delete the rest of the line
+\item \texttt{c} - Change the word at the cursor position (\emph{Insert Mode})
+\item \texttt{C} - Change the rest of the line (\emph{Insert Mode})
+\item \texttt{f} - Find next key in the rest of the current line
+\item \texttt{p} - Paste data deleted with \texttt{x}, \texttt{X}, \texttt{d} or \texttt{D} after the cursor
+   position
+\item \texttt{P} - Paste data deleted with \texttt{x}, \texttt{X}, \texttt{d} or \texttt{D} before the cursor
+   position
+\item \texttt{/} - Accept an input pattern and search the history for it
+\item \texttt{n} - Search for next occurrence of pattern (as entered with \texttt{/})
+\item \texttt{N} - Search for previous occurrence of pattern
+\item \texttt{\%} - Go to matching parenthesis
+\item \texttt{\textasciitilde{}} - Convert character to opposite (lower or upper) case and move
+   right
+\item \texttt{u} - Undo the last change (one level only)
+\item \texttt{U} - Undo all changes of the current line
+\item \texttt{g} - Display current contents of cut buffer (not in \texttt{vi})
+\end{itemize}
+
+Notes:
+
+\begin{itemize}
+\item The \texttt{d} command corresponds to the \texttt{dw} command of the \texttt{vi} editor,
+   and \texttt{c} corresponds to \texttt{cw}.
+\item Search patterns may contain ` \texttt{@} ' characters as wildcards.
+\item Lines shorter than 3 characters, lines beginning with a space
+   character, or duplicate lines are not entered into the history.
+\item The history is stored in the file ``.pil/history'' in the user's home
+   directory. The length of the history is limited to 1000 lines.
+\end{itemize}
+
+The following two key-combinations work both in Insert and Command Mode:
+
+\begin{itemize}
+\item \texttt{Ctrl-D} will immediately terminate the current process.
+\item \texttt{Ctrl-X} discards all input, abandons further processing, and returns
+   to the interpreter's top level (equivalent to invoking \texttt{quit}). This
+   is also useful when the program stopped at a breakpoint (see
+   single-stepping \emph{Debugging}), or after program execution was
+   interrupted with \texttt{Ctrl-C}.
+\end{itemize}
+
+Besides these two keys, in \emph{Insert Mode} only the following keys have a
+special meaning:
+
+\begin{itemize}
+\item BACKSPACE (\texttt{Ctrl-H}) and DEL erase the character to the left
+\item \texttt{Ctrl-V} inserts the next key literally
+\item TAB performs symbol and/or path completion: When a symbol (or path)
+   name is entered partially and TAB is pressed subsequently, all
+   internal symbols (and/or path names in the file system) matching the
+   partial input are shown in sequence.
+\item ESC terminates \emph{Input Mode} and enters \emph{Command Mode}
+\end{itemize}
+
+ 
+\subsection{Conclusion}
+\label{sec:tut-conclusion}
+
+
+Please take some time to experiment and to get used to command line
+editing. It will make life much easier in the future :-)
+
+
+ 
+\section{Browsing}
+\label{sec:tut-browsing}
+
+
+PicoLisp provides some functionality for inspecting pieces of data and
+code within the running system.
+
+ 
+\subsection{Basic tools}
+\label{sec:tut-basic-tools}
+
+
+The really basic tools are of course available and their name alone is
+enough to know: \texttt{print}, \texttt{size} \ldots{}
+
+But you will appreciate some more powerful tools like:
+
+\begin{itemize}
+\item \texttt{match}, a predicate which compares S-expressions with bindable
+   wildcards when matching,
+\end{itemize}
+
+ 
+\subsection{Inspect a symbol with \emph{show}}
+\label{sec:tut-inspect-a-symbol-with-show}
+
+
+The most commonly used tool is probably the \texttt{show} function. It takes a
+symbolic argument, and shows the symbol's name (if any), followed by its
+value cell, and then the contents of the property list on the following
+lines (assignment of such things to a symbol can be done with \texttt{set},
+\texttt{setq}, and \texttt{put}).
+
+
+\begin{wideverbatim}
+: (setq A '(This is the value))  # Set the value cell of 'A'
+-> (This is the value)
+: (put 'A 'key1 'val1)           # Store property 'key1'
+-> val1
+: (put 'A 'key2 'val2)           # and 'key2'
+-> val2
+: (show 'A)                      # Now 'show' the symbol 'A'
+A (This is the value)
+   key2 val2
+   key1 val1
+-> A
+\end{wideverbatim}
+
+\texttt{show} accepts an arbitrary number of arguments which are processed
+according to the rules of \texttt{get}, resulting in a symbol which is showed
+then.
+
+
+\begin{wideverbatim}
+: (put 'B 'a 'A)        # Put 'A' under the 'a'-property of 'B'
+-> A
+: (setq Lst '(A B C))   # Create a list with 'B' as second argument
+-> (A B C)
+: (show Lst 2 'a)       # Show the property 'a of the 2nd element of 'Lst'
+A (This is the value)   # (which is 'A' again)
+   key2 val2
+   key1 val1
+-> A
+\end{wideverbatim}
+
+ 
+\subsection{Inspect and edit with \emph{edit}}
+\label{sec:tut-inspect-and-edit-with-edit}
+
+
+Similar to \texttt{show} is \texttt{edit}. It takes an arbitrary number of symbolic
+arguments, writes them to a temporary file in a format similar to
+\texttt{show}, and starts the \texttt{vim} editor with that file.
+
+
+\begin{wideverbatim}
+: (edit 'A 'B)
+\end{wideverbatim}
+
+The \texttt{vim} window will look like
+
+
+\begin{wideverbatim}
+A (This is the value)
+key1 val1
+key2 val2
+
+(********)
+
+B NIL
+a A  # (This is the value)
+
+(********)
+\end{wideverbatim}
+
+Now you can modify values or properties. You should not touch the
+parenthesized asterisks, as they serve as delimiters. If you position
+the cursor on the first character of a symbol name and type  \texttt{K} 
+(``Keyword lookup''), the editor will be restarted with that symbol added
+to the editor window.  \texttt{Q}  (for ``Quit'') will bring you back to the
+previous view.
+
+\texttt{edit} is also very useful to browse in a database. You can follow the
+links between objects with  \texttt{K} , and even - e.g. for low-level repairs
+\begin{itemize}
+\item modify the data (but only if you are really sure about what you are
+\end{itemize}
+doing, and don't forget to \texttt{commit} when you are done).
+
+ 
+\subsection{Built-in pretty print with \emph{pp}}
+\label{sec:tut-built-in-pretty-print-with-pp}
+
+
+The \emph{pretty-print} function \texttt{pp} takes a symbol that has a function
+defined (or two symbols that specify message and class for a method
+definition), and displays that definition in a formatted and indented
+way.
+
+
+\begin{wideverbatim}
+: (pp 'pretty)
+(de pretty (X N . @)
+   (setq N (abs (space (or N 0))))
+   (while (args) (printsp (next)))
+   (if (or (atom X) (>= 12 (size X)))
+      (print X)
+      (while (== 'quote (car X))
+         (prin "'")
+         (pop 'X) )
+      (let Z X
+         (prin "(")
+         (cond
+            ((memq (print (pop 'X)) *PP)
+               (cond
+                  ((memq (car Z) *PP1)
+                     (if (and (pair (car X)) (pair (cdar X)))
+                        (when (>= 12 (size (car X)))
+                           (space)
+                           (print (pop 'X)) )
+                        (space)
+                        (print (pop 'X))
+                        (when
+                           (or
+                              (atom (car X))
+                              (>= 12 (size (car X))) )
+                           (space)
+                           (print (pop 'X)) ) ) )
+                  ((memq (car Z) *PP2)
+                     (inc 'N 3)
+                     (loop
+                        (prinl)
+                        (pretty (cadr X) N (car X))
+                        (NIL (setq X (cddr X)) (space)) ) )
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+
+                  ((or (atom (car X)) (>= 12 (size (car X))))
+                     (space)
+                     (print (pop 'X)) ) ) )
+            ((and (memq (car Z) *PP3) (>= 12 (size (head 2 X))))
+               (space)
+               (print (pop 'X) (pop 'X)) ) )
+         (when X
+            (loop
+               (T (== Z X) (prin " ."))
+               (T (atom X) (prin " . ") (print X))
+               (prinl)
+               (pretty (pop 'X) (+ 3 N))
+               (NIL X) )
+            (space) )
+         (prin ")") ) ) )
+-> pretty
+\end{wideverbatim}
+
+The style is the same as we use in source files:
+
+\begin{itemize}
+\item The indentation level is three spaces
+\item If a list is too long (to be precise: if its \texttt{size} is greater than
+   12), pretty-print the CAR on the current line, and each element of
+   the CDR recursively on its own line.
+\item A closing parenthesis a preceded by a space if the corresponding open
+   parenthesis is not on the same line
+\end{itemize}
+
+ 
+\subsection{Inspect elements one by one with \emph{more}}
+\label{sec:tut-inspect-elements-one-by-one-with-more}
+
+
+\texttt{more} is a simple tool that displays the elements of a list one by one.
+It stops after each element and waits for input. If you just hit ENTER,
+\texttt{more} continues with the next element, otherwise (usually I type a dot
+(\texttt{.}) followed by ENTER) it terminates.
+
+
+\begin{wideverbatim}
+: (more (1 2 3 4 5 6))
+1                          # Hit ENTER
+2.                         # Hit '.' and ENTER
+-> T                       # stopped
+\end{wideverbatim}
+
+Optionally \texttt{more} takes a function as a second argument and applies that
+function to each element (instead of the default \texttt{print}). Here, often
+\texttt{show} or \texttt{pp} (see below) is used.
+
+
+\begin{wideverbatim}
+: (more '(A B))            # Step through 'A' and 'B'
+A
+B
+-> NIL
+: (more '(A B) show)       # Step through 'A' and 'B' with 'show'
+A (This is the value)      # showing 'A'
+   key2 val2
+   key1 val1
+                           # Hit ENTER
+B NIL                      # showing 'B'
+   a A
+-> NIL
+\end{wideverbatim}
+
+ 
+\subsection{Search through available symbols with \emph{what}}
+\label{sec:tut-search-through-available-symbols-with-what}
+
+
+The \texttt{what} function returns a list of all internal symbols in the system
+which match a given pattern (with  \texttt{@}  wildcard characters).
+
+
+\begin{wideverbatim}
+: (what "prin@")
+-> (prin print prinl print> printsp println)
+\end{wideverbatim}
+
+ 
+\subsection{Search through values or properties of symbols with \emph{who}}
+\label{sec:tut-search-through-values-or-properties-of-symbols-with-can}
+
+
+The function \texttt{can} returns a list which indicates which classes \emph{can}
+accept a given message. Again, this list is suitable for iteration with
+\texttt{pp}:
+
+
+\begin{wideverbatim}
+: (can 'del>)                                   # Which classes accept 'del>' ?
+-> ((del> . +List) (del> . +Entity) (del> . +relation))
+
+: (more (can 'del>) pp)                         # Inspect the methods with 'pp'
+(dm (del> . +List) (Obj Old Val)
+   (and ((<> Old Val) (delete Val Old)) )
+
+(dm (del> . +Entity) (Var Val)
+   (when
+      (and
+         Val
+         (has> (meta This Var) Val (get This Var)) )
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+
+      (let Old (get This Var)
+         (rel>
+            (meta This Var)
+            This
+            Old
+            (put This Var (del> (meta This Var) This Old @)) )
+         (when (asoq Var (meta This 'Aux))
+            (relAux This Var Old (cdr @)) )
+         (upd> This Var Old) ) ) )
+
+(dm (del> . +relation) (Obj Old Val)
+   (and ((<> Old Val) Val) )
+\end{wideverbatim}
+
+ 
+\subsection{Inspect dependencies with \emph{dep}}
+\label{sec:tut-inspect-dependencies-with-dep}
+
+
+\texttt{dep} shows the dependencies in a class hierarchy. That is, for a given
+class it displays the tree of its (super)class(es) above it, and the
+tree of its subclasses below it.
+
+To view the complete hierarchy of input fields, we start with the root
+class \texttt{+relation}:
+
+
+\begin{wideverbatim}
+: (dep '+relation)
++relation
+   +Bag
+   +Any
+   +Blob
+   +Link
+      +Joint
+   +Bool
+   +Symbol
+      +String
+   +Number
+      +Time
+      +Date
+-> +relation
+\end{wideverbatim}
+
+If we are interested in \texttt{+Link}:
+
+
+\begin{wideverbatim}
+: (dep '+Link)
+   +relation
++Link
+   +Joint
+-> +Link
+\end{wideverbatim}
+
+This says that \texttt{+Link} is a subclass of \texttt{+relation}, and has a single
+subclass (\texttt{+Joint}).
+
+
+ 
+\section{Defining Functions}
+\label{sec:tut-defining-functions}
+
+
+Most of the time during programming is spent defining functions (or
+methods). In the following we will concentrate on functions, but most
+will be true for methods as well except for using \texttt{dm} instead of \texttt{de}.
+
+ 
+\subsection{Functions with no argument}
+\label{sec:tut-functions-with-no-argument}
+
+
+The notorious ``Hello world'' function must be defined:
+
+
+\begin{wideverbatim}
+: (de hello ()
+   (prinl "Hello world") )
+-> hello
+\end{wideverbatim}
+
+The \texttt{()} in the first line indicates a function without arguments. The
+body of the function is in the second line, consisting of a single
+statement. The last line is the return value of \texttt{de}, which here is the
+defined symbol. From now on we will omit the return values of examples
+when they are unimportant.
+
+Now you can call this function this way:
+
+
+\begin{wideverbatim}
+: (hello)
+Hello world
+\end{wideverbatim}
+
+ 
+\subsection{Functions with one argument}
+\label{sec:tut-functions-with-one-argument}
+
+
+A function with an argument might be defined this way:
+
+
+\begin{wideverbatim}
+: (de hello (X)
+   (prinl "Hello " X) )
+# hello redefined
+-> hello
+\end{wideverbatim}
+
+PicoLisp informs you that you have just redefined the function. This
+might be a useful warning in case you forgot that a bound symbol with
+that name already existed.
+
+
+\begin{wideverbatim}
+: (hello "world")
+Hello world
+\end{wideverbatim}
+
+
+\begin{wideverbatim}
+: (hello "Alex")
+Hello Alex
+\end{wideverbatim}
+
+ 
+\subsection{Preventing arguments evaluation and variable number of arguments}
+\label{sec:tut-preventing-arguments-evaluation-and-variable-number-of-arguments}
+
+
+Normally, PicoLisp evaluates the arguments before it passes them to a
+function:
+
+
+\begin{wideverbatim}
+: (hello (+ 1 2 3))
+Hello 6
+\end{wideverbatim}
+
+
+\begin{wideverbatim}
+: (setq A 1  B 2)       # Set 'A' to 1 and 'B' to 2
+-> 2
+: (de foo (X Y)         # 'foo' returns the list of its arguments
+   (list X Y) )
+-> foo
+: (foo A B)             # Now call 'foo' with 'A' and 'B'
+-> (1 2)                # -> We get a list of 1 and 2, the values of 'A' and 'B'
+\end{wideverbatim}
+
+In some cases you don't want that. For some functions (\texttt{setq} for
+example) it is better if the function gets all arguments unevaluated,
+and can decide for itself what to do with them.
+
+For such cases you do not define the function with a \emph{list} of
+parameters, but give it a \emph{single atomic} parameter instead. PicoLisp
+will then bind all (unevaluated) arguments as a list to that parameter.
+
+
+\begin{wideverbatim}
+: (de foo X
+   (list (car X) (cadr X)) )        # 'foo' lists the first two arguments
+
+: (foo A B)                         # Now call it again
+-> (A B)                            # -> We don't get '(1 2)', but '(A B)'
+
+: (de foo X
+   (list (car X) (eval (cadr X))) ) # Now evaluate only the second argument
+
+: (foo A B)
+-> (A 2)                            # -> We get '(A 2)'
+\end{wideverbatim}
+
+ 
+\subsection{Mixing evaluated arguments and variable number of unevaluated}
+\label{sec:tut-mixing-evaluated-arguments-and-variable-number-of-unevaluated}
+
+arguments
+
+As a logical consequence, you can combine these principles. To define a
+function with 2 evaluated and an arbitrary number of unevaluated
+arguments:
+
+
+\begin{wideverbatim}
+: (de foo (X Y . Z)     # Evaluate only the first two args
+   (list X Y Z) )
+
+: (foo A B C D E)
+-> (1 2 (C D E))        # -> Get the value of 'A' and 'B' and the remaining list
+\end{wideverbatim}
+
+ 
+\subsection{Variable number of evaluated arguments}
+\label{sec:tut-variable-number-of-evaluated-arguments}
+
+
+More common, in fact, is the case where you want to pass an arbitrary
+number of \emph{evaluated} arguments to a function. For that, PicoLisp
+recognizes the symbol \texttt{@} as a single atomic parameter and remembers all
+evaluated arguments in an internal frame. This frame can then be
+accessed sequentially with the \texttt{args}, \texttt{next}, \texttt{arg} and \texttt{rest}
+functions.
+
+
+\begin{wideverbatim}
+: (de foo @
+   (list (next) (next)) )     # Get the first two arguments
+
+: (foo A B)
+-> (1 2)
+\end{wideverbatim}
+
+Again, this can be combined:
+
+
+\begin{wideverbatim}
+: (de foo (X Y . @)
+   (list X Y (next) (next)) ) # 'X' and 'Y' are fixed arguments
+
+: (foo A B (+ 3 4) (* 3 4))
+-> (1 2 7 12)                 # All arguments are evaluated
+\end{wideverbatim}
+
+These examples are not very useful, because the advantage of a variable
+number of arguments is not used. A function that prints all its
+evaluated numeric arguments, each on a line followed by its squared
+value:
+
+
+\begin{wideverbatim}
+: (de foo @
+   (while (args)                            # Check if there are some args left
+      (println (next) (* (arg) (arg))) ) )  # Call the last arg (next) returned
+
+: (foo (+ 2 3) (- 7 1) 1234 (* 9 9))
+5 25
+6 36
+1234 1522756
+81 6561
+-> 6561
+\end{wideverbatim}
+
+This next example shows the behaviour of \texttt{args} and \texttt{rest}:
+
+
+\begin{wideverbatim}
+: (de foo @
+   (while (args)
+      (next)
+      (println (arg) (args) (rest)) ) )
+: (foo 1 2 3)
+1 T (2 3)
+2 T (3)
+3 NIL NIL
+\end{wideverbatim}
+
+Finally, it is possible to pass all these evaluated arguments to another
+function, using \texttt{pass}:
+
+
+\begin{wideverbatim}
+: (de foo @
+   (pass println 9 8 7)       # First print all arguments preceded by 9, 8, 7
+   (pass + 9 8 7) )           # Then add all these values
+
+: (foo (+ 2 3) (- 7 1) 1234 (* 9 9))
+9 8 7 5 6 1234 81             # Printing ...
+-> 1350                       # Return the result
+\end{wideverbatim}
+
+ 
+\subsection{Anonymous functions without the \emph{lambda} keyword}
+\label{sec:tut-anonymous-functions-without-the-lambda}
+
+
+There's no distinction between code and data in PicoLisp, \texttt{quote} will
+do what you want (see also \emph{this FAQ entry}).
+
+
+\begin{wideverbatim}
+: ((quote (X) (* X X)) 9)
+-> 81
+\end{wideverbatim}
+
+
+\begin{wideverbatim}
+: (setq f '((X) (* X X)))  # This is equivalent to (de f (X) (* X X))
+-> ((X) (* X X))
+: f
+-> ((X) (* X X))
+: (f 3)
+-> 9
+\end{wideverbatim}
+
+ 
+\section{Debugging}
+\label{sec:tut-debugging}
+
+
+There are two major ways to debug functions (and methods) at runtime:
+\emph{Tracing} and \emph{single-stepping}.
+
+In this section we will use the REPL to explore the debugging
+facilities, but in the \emph{Scripting} section, you will learn
+how to launch PicoLisp scripts with some selected functions debugged:
+
+
+\begin{wideverbatim}
+$ pil app/file1.l -"trace 'foo" -main -"debug 'bar" app/file2.l +
+\end{wideverbatim}
+
+ 
+\subsection{Tracing}
+\label{sec:tut-tracing}
+
+
+\emph{Tracing} means letting functions of interest print their name and
+arguments when they are entered, and their name again and the return
+value when they are exited.
+
+For demonstration, let's define the unavoidable factorial function (or
+just \texttt{load} the file ``\texttt{@doc/fun.l}''):
+
+
+\begin{wideverbatim}
+(de fact (N)
+   (if (=0 N)
+      1
+      (* N (fact (dec N))) ) )
+\end{wideverbatim}
+
+With \texttt{trace} we can put it in trace mode:
+
+
+\begin{wideverbatim}
+: (trace 'fact)
+-> fact
+\end{wideverbatim}
+
+Calling \texttt{fact} now will display its execution trace.
+
+
+\begin{wideverbatim}
+: (fact 3)
+ fact : 3
+  fact : 2
+   fact : 1
+    fact : 0
+    fact = 1
+   fact = 1
+  fact = 2
+ fact = 6
+-> 6
+\end{wideverbatim}
+
+As can be seen here, each level of function call will indent by an
+additional space. Upon function entry, the name is separated from the
+arguments with a colon (\texttt{:}), and upon function exit with an equals sign
+ \texttt{=}  from the return value.
+
+\texttt{trace} works by modifying the function body, so generally it works only
+for functions defined as lists (lambda expressions, see
+\emph{Evaluation}). Tracing a C-function is possible, however,
+when it is a function that evaluates all its arguments.
+
+So let's trace the functions \texttt{=0} and \texttt{*}:
+
+
+\begin{wideverbatim}
+: (trace '=0)
+-> =0
+: (trace '*)
+-> *
+\end{wideverbatim}
+
+If we call \texttt{fact} again, we see the additional output:
+
+
+\begin{wideverbatim}
+: (fact 3)
+ fact : 3
+  =0 : 3
+  =0 = NIL
+  fact : 2
+   =0 : 2
+   =0 = NIL
+   fact : 1
+    =0 : 1
+    =0 = NIL
+    fact : 0
+     =0 : 0
+     =0 = 0
+    fact = 1
+    * : 1 1
+    * = 1
+   fact = 1
+   * : 2 1
+   * = 2
+  fact = 2
+  * : 3 2
+  * = 6
+ fact = 6
+-> 6
+\end{wideverbatim}
+
+To reset a function to its untraced state, call \texttt{untrace}:
+
+
+\begin{wideverbatim}
+: (untrace 'fact)
+-> fact
+: (untrace '=0)
+-> =0
+: (untrace '*)
+-> *
+\end{wideverbatim}
+
+or simply use \texttt{mapc}:
+
+\begin{wideverbatim}
+: (mapc untrace '(fact =0 *))
+-> *
+\end{wideverbatim}
+
+ 
+\subsection{Single-stepping}
+\label{sec:tut-single-stepping}
+
+
+\emph{Single-stepping} means to execute a function step by step, giving the
+programmer an opportunity to look more closely at what is happening. The
+function \texttt{debug} inserts a breakpoint into each top-level expression of
+a function. When the function is called, it stops at each breakpoint,
+displays the expression it is about to execute next (this expression is
+also stored into the global variable \texttt{\textasciicircum{}}) and enters a read-eval-loop.
+The programmer can then
+
+\begin{itemize}
+\item inspect the current environment by typing variable names or calling
+   functions
+\item execute \texttt{(d)} to recursively debug the next expression (looping
+   through subexpressions of this expression)
+\item execute \texttt{(e)} to evaluate the next expression, to see what will
+   happen without actually advancing on
+\item type ENTER (that is, enter an empty line) to leave the read-eval loop
+   and continue with the next expression
+\end{itemize}
+
+Thus, in the simplest case, single-stepping consists of just hitting
+ENTER repeatedly to step through the function.
+
+To try it out, let's look at the \texttt{stamp} system function. You may need
+to have a look at
+
+\begin{itemize}
+\item \texttt{=T} (T test),
+\item \texttt{date} and \texttt{time} (grab system date and time)
+\item \texttt{default} (conditional assignments)
+\item \texttt{pack} (kind of concatenation), and
+\item \texttt{dat\$} and \texttt{tim\$} (date and time formats)
+\end{itemize}
+
+to understand this definition.
+
+
+\begin{wideverbatim}
+: (pp 'stamp)
+(de stamp (Dat Tim)
+   (and (=T Dat) (setq Dat (date T)))
+   (default Dat (date) Tim (time T))
+   (pack (dat$ Dat "-") " " (tim$ Tim T)) )
+-> stamp
+\end{wideverbatim}
+
+
+\begin{wideverbatim}
+: (debug 'stamp)                       # Debug it
+-> T
+: (stamp)                              # Call it again
+(and (=T Dat) (setq Dat (date T)))     # stopped at first expression
+!                                      # ENTER
+(default Dat (date) Tim (time T))      # second expression
+!                                      # ENTER
+(pack (dat$ Dat "-") " " (tim$ ...     # third expression
+! Tim                                  # inspect 'Tim' variable
+-> 41908
+! (time Tim)                           # convert it
+-> (11 38 28)
+!                                      # ENTER
+-> "2004-10-29 11:38:28"               # done, as there are only 3 expressions
+\end{wideverbatim}
+
+Now we execute it again, but this time we want to look at what's
+happening inside the second expression.
+
+
+\begin{wideverbatim}
+: (stamp)                              # Call it again
+(and (=T Dat) (setq Dat (date T)))
+!                                      # ENTER
+(default Dat (date) Tim (time T))
+!                                      # ENTER
+(pack (dat$ Dat "-") " " (tim$ ...     # here we want to look closer
+! (d)                                  # debug this expression
+-> T
+!                                      # ENTER
+(dat$ Dat "-")                         # stopped at first subexpression
+! (e)                                  # evaluate it
+-> "2004-10-29"
+!                                      # ENTER
+(tim$ Tim T)                           # stopped at second subexpression
+! (e)                                  # evaluate it
+-> "11:40:44"
+!                                      # ENTER
+-> "2004-10-29 11:40:44"               # done
+\end{wideverbatim}
+
+The breakpoints still remain in the function body. We can see them when
+we pretty-print it:
+
+
+\begin{wideverbatim}
+: (pp 'stamp)
+(de stamp (Dat Tim)
+   (! and (=T Dat) (setq Dat (date T)))
+   (! default Dat (date) Tim (time T))
+   (! pack
+      (! dat$ Dat "-")
+      " "
+      (! tim$ Tim T) ) )
+-> stamp
+\end{wideverbatim}
+
+To reset the function to its normal state, call \texttt{unbug}:
+
+
+\begin{wideverbatim}
+: (unbug 'stamp)
+\end{wideverbatim}
+
+Often, you will not want to single-step a whole function. Just use
+\texttt{edit} (see above) to insert a single breakpoint (the exclamation mark
+followed by a space) as CAR of an expression, and run your program.
+Execution will then stop there as described above; you can inspect the
+environment and continue execution with ENTER when you are done.
+
+ 
+\section{Functional I/O}
+\label{sec:tut-functional-i/o}
+
+
+Input and output in PicoLisp is functional, in the sense that there are
+not variables assigned to file descriptors, which need then to be passed
+to I/O functions for reading, writing and closing. Instead, these
+functions operate on implicit input and output channels, which are
+created and maintained as dynamic environments.
+
+Standard input and standard output are the default channels. Try reading
+a single expression:
+
+
+\begin{wideverbatim}
+: (read)
+(a b c)        # Console input
+-> (a b c)
+\end{wideverbatim}
+
+To read from a file, we redirect the input with \texttt{in}. Note that comments
+and whitespace are automatically skipped by \texttt{read}:
+
+
+\begin{wideverbatim}
+: (in "@doc/fun.l" (read))
+-> (de fact (N) (if (=0 N) 1 (* N (fact (dec N)))))
+\end{wideverbatim}
+
+The \texttt{skip} function can also be used directly. To get the first
+non-white character in the file with \texttt{char}:
+
+
+\begin{wideverbatim}
+: (in "@doc/fun.l" (skip "#") (char))
+-> "("
+\end{wideverbatim}
+
+\texttt{from} searches through the input stream for given patterns. Typically,
+this is not done with Lisp source files (there are better ways), but for
+a simple example let's extract all items immediately following \texttt{fact} in
+the file,
+
+
+\begin{wideverbatim}
+: (in "@doc/fun.l" (while (from "fact ") (println (read))))
+(N)
+(dec N)
+\end{wideverbatim}
+
+or the word following ``(de'' with \texttt{till}:
+
+
+\begin{wideverbatim}
+: (in "@doc/fun.l" (from "(de ") (till " " T)))
+-> "fact"
+\end{wideverbatim}
+
+With \texttt{line}, a line of characters is read, either into a single
+\emph{transient} symbol (the type used by PicoLisp
+for strings),
+
+
+\begin{wideverbatim}
+: (in "@doc/tut.html" (line T))
+-> "<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://..."
+\end{wideverbatim}
+
+or into a list of symbols (characters):
+
+
+\begin{wideverbatim}
+: (in "@doc/tut.html" (line))
+-> ("<" "!" "D" "O" "C" "T" "Y" "P" "E" " " "H" "T" "M" "L" ...
+\end{wideverbatim}
+
+\texttt{line} is typically used to read tabular data from a file. Additional
+arguments can split the line into fixed-width fields, as described in
+the \texttt{reference manual}. If, however, the data are of variable width,
+delimited by some special character, the \texttt{split} function can be used to
+extract the fields. A typical way to import the contents of such a file
+is:
+
+
+\begin{wideverbatim}
+(load "@lib/import.l")
+
+(in '("bin/utf2" "importFile.txt")              # Pipe: Convert to UTF-8
+   (until (eof)                                 # Process whole file
+      (let L (split (line) "^I")                # TAB-delimited data
+         ... use 'getStr', 'getNum' etc ...     # process them
+\end{wideverbatim}
+
+Some more examples with \texttt{echo}:
+
+
+\begin{wideverbatim}
+(in "a"                                         # Copy the first 40 Bytes
+   (out "b"                                     # from file "a" to file "b"
+      (echo 40) ) )
+
+(in "@doc/tut.html"                             # Show the HTTP-header
+   (line)
+   (echo "<body>") )
+
+(out "file.mac"                                 # Convert to Macintosh
+   (in "file.txt"                               # from Unix or DOS format:
+      (while (char)
+         (prin
+            (case @
+               ("^M" NIL)                       # ignore CR
+               ("^J" "^M")                      # convert CR to LF
+               (T @) ) ) ) ) )                  # otherwise no change
+
+(out "c"                                        # Merge the contents of "a"
+   (in "b"                                      # and "b" into "c"
+      (in "a"
+         (while (read)                          # Read an item from "a",
+            (println @ (in -1 (read))) ) ) ) )  # print it with an item from "b"
+\end{wideverbatim}
+
+ 
+\section{Scripting}
+\label{sec:tut-scripting}
+
+
+There are two possibilities to get the PicoLisp interpreter into doing
+useful work: via command line arguments, or as a stand-alone script.
+
+ 
+\subsection{Command line arguments for the PicoLisp interpreter}
+\label{sec:tut-command-line-arguments-for-the-picolisp-interpreter}
+
+
+The command line can specify either files for execution, or arbitrary
+Lisp expressions for direct evaluation (see
+\emph{Invocation}): if an argument starts with a hyphen, it
+is evaluated, otherwise it is \texttt{load} d as a file. A typical invocation
+might look like:
+
+
+\begin{wideverbatim}
+$ pil app/file1.l -main app/file2.l +
+\end{wideverbatim}
+
+It loads the debugging environment, an application source file, calls
+the main function, and then loads another application source. In a
+typical development and debugging session, this line is often modified
+using the shell's history mechanisms, e.g. by inserting debugging
+statements:
+
+
+\begin{wideverbatim}
+$ pil app/file1.l -"trace 'foo" -main -"debug 'bar" app/file2.l +
+\end{wideverbatim}
+
+Another convenience during debugging and testing is to put things into
+the command line (shell history) which would otherwise have to be done
+each time in the application's user interface:
+
+
+\begin{wideverbatim}
+$ pil app/file1.l -main app/file2.l -go -'login "name" "password"' +
+\end{wideverbatim}
+
+The final production release of an application usually includes a shell
+script, which initializes the environment, does some bookkeeping and
+cleanup, and calls the application with a proper command line. It is no
+problem if the command line is long and complicated.
+
+For small utility programs, however, this is overkill. Enter full
+PicoLisp scripts.
+
+ 
+\subsection{PicoLisp scripts}
+\label{sec:tut-picolisp-scripts}
+
+
+It is better to write a single executable file using the mechanisms of
+``interpreter files''. If the first two characters in an executable file
+are ` \texttt{\#!} ', the operating system kernel will pass this file to an
+interpreter program whose pathname is given in the first line
+(optionally followed by a single argument). This is fast and efficient,
+because the overhead of a subshell is avoided.
+
+Let's assume you installed PicoLisp in the directory
+``/home/foo/picolisp/'', and put links to the executable and the
+installation directory as:
+
+
+\begin{wideverbatim}
+$ ln -s /home/foo/picolisp /usr/lib/picolisp
+$ ln -s /usr/lib/picolisp/bin/picolisp /usr/bin/picolisp
+\end{wideverbatim}
+
+Then a simple hello-world script might look like:
+
+
+\begin{wideverbatim}
+#!/usr/bin/picolisp /usr/lib/picolisp/lib.l
+(prinl "Hello world!")
+(bye)
+\end{wideverbatim}
+
+If you write this into a text file, and use \texttt{chmod} to set it to
+``executable'', it can be executed like any other command. Note that
+(because \texttt{\#} is the comment character in PicoLisp) the first line will
+not be interpreted, and you can still use that file as a normal command
+line argument to PicoLisp (useful during debugging).
+
+ 
+\subsection{Grab command line arguments from PicoLisp scripts}
+\label{sec:tut-grab-command-line-arguments-from-picolisp-scripts}
+
+
+The fact that a hyphen causes evaluation of command line arguments can
+be used to simulate something like command line options. The following
+script defines two functions \texttt{a} and \texttt{f}, and then calls \texttt{(load T)} to
+process the rest of the command line (which otherwise would be ignored
+because of the \texttt{(bye)} statement):
+
+
+\begin{wideverbatim}
+#!/usr/bin/picolisp /usr/lib/picolisp/lib.l
+
+(de a ()
+   (println '-a '-> (opt)) )
+
+(de f ()
+   (println '-f '-> (opt)) )
+
+(load T)
+(bye)
+\end{wideverbatim}
+
+(\texttt{opt} retrieves the next command line option)
+
+Calling this script (let's say we named it ``testOpts'') gives:
+
+
+\begin{wideverbatim}
+$ ./testOpts -f abc
+-f -> "abc"
+$ ./testOpts -a xxx  -f yyy
+-a -> "xxx"
+-f -> "yyy"
+\end{wideverbatim}
+
+We have to be aware of the fact, however, that the aggregation of
+arguments like
+
+
+\begin{wideverbatim}
+$ ./testOpts -axxx  -fyyy
+\end{wideverbatim}
+
+or
+
+
+\begin{wideverbatim}
+$ ./testOpts -af yyy
+\end{wideverbatim}
+
+cannot be achieved with this simple and general mechanism of command
+line processing.
+
+ 
+\subsection{Run scripts from arbitrary places on the host file system}
+\label{sec:tut-run-scripts-from-arbitrary-places-on-the-host-file-system}
+
+
+Utilities are typically used outside the context of the PicoLisp
+environment. All examples above assumed that the current working
+directory is the PicoLisp installation directory, which is usually all
+right for applications developed in that environment. Command line file
+arguments like ``app/file1.l'' will be properly found.
+
+To allow utilities to run in arbitrary places on the host file system,
+the concept of \emph{home directory substitution} was introduced. The
+interpreter remembers internally at start-up the pathname of its first
+argument (usually ``lib.l''), and substitutes any leading ` \texttt{@} ' character
+in subsequent file names with that pathname. Thus, to run the above
+example in some other place, simply write:
+
+
+\begin{wideverbatim}
+$ /home/foo/picolisp/dbg @app/file1.l -main @app/file2.l
+\end{wideverbatim}
+
+that is, supply a full path name to the initial command (here `p'), or
+put it into your \texttt{PATH} variable, and prefix each file which has to be
+loaded from the PicoLisp home directory with a \texttt{@} character. ``Normal''
+files (not prefixed by \texttt{@}) will be opened or created relative to the
+current working directory as usual.
+
+Stand-alone scripts will often want to load additional modules from the
+PicoLisp environment, beyond the ``lib.l'' we provided in the first line
+of the hello-world script. Typically, at least a call to
+
+
+\begin{wideverbatim}
+(load "@lib/misc.l")
+\end{wideverbatim}
+
+(note the home directory substitution) will be included near the
+beginning of the script.
+
+As a more complete example, here is a script which extracts the date,
+name and size of the latest official PicoLisp release version from the
+download web site, and prints it to standard output:
+
+
+\begin{wideverbatim}
+#!/usr/bin/picolisp /usr/lib/picolisp/lib.l
+
+(load "@lib/misc.l" "@lib/http.l")
+
+(use (@Date @Name @Size)
+   (when
+      (match
+         '(@Date " " "-" " " @Name " " "(" @Size ")")
+         (client "software-lab.de" 80 "down.html"
+            (from "Release Archive")
+            (from ".tgz">")
+            (till "") ) )
+      (prinl @Name)
+      (prinl @Date " -- " @Size) ) )
+
+(bye)
+\end{wideverbatim}
+
+ 
+\subsection{Editing scripts}
+\label{sec:tut-editing-scripts}
+
+
+We recommend that you have a terminal window open, and try the examples
+by yourself. You may either type them in, directly to the PicoLisp
+interpreter, or edit a separate source file (e.g. \texttt{''@doc/fun.l''}) in a
+second terminal window and load it into PicoLisp with
+
+
+\begin{wideverbatim}
+: (load "@doc/fun.l")
+\end{wideverbatim}
+
+each time you have modified and saved it.
+
+ 
+\subsection{Editing scripts with vi}
+\label{sec:tut-editing-scripts-with-vi}
+
+
+Once a function is loaded from a source file, you can call `vim'
+directly on that function with
+
+
+\begin{wideverbatim}
+: (vi 'fact)
+\end{wideverbatim}
+
+The function `vi' opens the appropriate source file, and jumps to the
+right line where `fact' is defined. When you modify it, you can simply
+call `ld' to (re)load that source file
+
+
+\begin{wideverbatim}
+: (ld)
+\end{wideverbatim}
+
+ 
+\section{Objects and Classes}
+\label{sec:tut-objects-and-classes}
+
+
+The PicoLisp object model is very simple, yet flexible and powerful.
+Objects as well as classes are both implemented as symbols. In fact,
+there is no formal difference between objects and classes; classes are
+more a conceptual design consideration in the head of the programmer
+than a physical reality.
+
+Having said this, we declare that normally:
+
+\begin{enumerate}
+\item A Class
+\begin{itemize}
+\item Has a name (interned symbol)
+\item Has method definitions and superclass(es) in the value cell
+\item May have class variables (attributes) in the property list
+\end{itemize}
+\item An Object
+\begin{itemize}
+\item Has no name (anonymous symbol) or is an external symbol
+\item Has class(es) (and optionally method definitions) in the value
+      cell
+\item Has instance variables (attributes) in the property list
+\end{itemize}
+\end{enumerate}
+
+So the main difference between classes and objects is that the former
+ones usually are internal symbols. By convention, their names start with
+a  \texttt{+} . Sometimes it makes sense, however, to create named objects (as
+global singletons, for example), or even anonymous classes.
+
+Both classes and objects have a list in their value cell, consisting of
+method definitions (often empty for objects) and (super)class(es). And
+both classes and objects have local data in their property lists (often
+empty for classes). This implies, that any given object (as an instance
+of a class) may have private (object-local) methods defined.
+
+It is rather difficult to contrive a simple OOP example. We constructed
+a hierarchy of geometric shapes, with a base class \texttt{+Shape} and two
+subclasses \texttt{+Rectangle} and \texttt{+Circle}.
+
+The source code is included as ``\texttt{@doc/shape.l}'' in the PicoLisp
+distribution, so you don't have to type it in. Just \texttt{load} the file, or
+start it from the shell as:
+
+
+\begin{wideverbatim}
+$ pil @doc/shape.l +
+\end{wideverbatim}
+
+Let's look at it piece by piece. Here's the base class:
+
+
+\begin{wideverbatim}
+(class +Shape)
+# x y
+
+(dm T (X Y)
+   (=: x X)
+   (=: y Y) )
+
+(dm move> (DX DY)
+   (inc (:: x) DX)
+   (inc (:: y) DY) )
+\end{wideverbatim}
+
+The first line `\texttt{(class +Shape)}' defines the symbol
+\texttt{+Shape} as a class without superclasses. The following method
+definitions will go to that class.
+
+The comment  \texttt{\# x y}  in the second line is just a convention, to
+indicate what instance variables (properties) that class uses. As
+PicoLisp is a dynamic language, a class can be extended at runtime with
+any number of properties, and there is nothing like a fixed object size
+or structure. This comment is a hint of what the programmer thinks to be
+essential and typical for that class. In the case of \texttt{+Shape}, \texttt{x} and
+\texttt{y} are the coordinates of the shape's origin.
+
+Then we have two method definitions, using the keyword \texttt{dm} for ``define
+method''. The first method is special, in that its name is \texttt{T}. Each time
+a new object is created, and a method with that name is found in its
+class hierarchy, that method will be executed. Though this looks like a
+``constructor'' in other programming languages, it should probably better
+be called ``initializer''. The \texttt{T} method of \texttt{+Shape} takes two arguments
+\texttt{X} and \texttt{Y}, and stores them in the object's property list.
+
+The second method \texttt{move>} changes the object's origin by adding the
+offset values \texttt{DX} and \texttt{DY} to the object's origin.
+
+Now to the first derived class:
+
+
+\begin{wideverbatim}
+(class +Rectangle +Shape)
+# dx dy
+
+(dm T (X Y DX DY)
+   (super X Y)
+   (=: dx DX)
+   (=: dy DY) )
+
+(dm area> ()
+   (* (: dx) (: dy)) )
+
+(dm perimeter> ()
+   (* 2 (+ (: dx) (: dy))) )
+
+(dm draw> ()
+   (drawRect (: x) (: y) (: dx) (: dy)) )
+\end{wideverbatim}
+
+\texttt{+Rectangle} is defined as a subclass of \texttt{+Shape}. The comment
+ \texttt{\# dx dy}  indicates that \texttt{+Rectangle} has a width and a height in
+addition to the origin coordinates inherited from \texttt{+Shape}.
+
+The \texttt{T} method passes the origin coordinates \texttt{X} and \texttt{Y} to the \texttt{T}
+method of the superclass (\texttt{+Shape}), then stores the width and height
+parameters into \texttt{dx} and \texttt{dy}.
+
+Next we define the methods \texttt{area>} and \texttt{perimeter>} which do some
+obvious calculations, and a method \texttt{draw>} which is supposed to draw the
+shape on the screen by calling some hypothetical function \texttt{drawRect}.
+
+Finally, we define a \texttt{+Circle} class in an analog way, postulating the
+hypothetical function \texttt{drawCircle}:
+
+
+\begin{wideverbatim}
+(class +Circle +Shape)
+# r
+
+(dm T (X Y R)
+   (super X Y)
+   (=: r R) )
+
+(dm area> ()
+   (*/ (: r) (: r) 31415927 10000000) )
+
+(dm perimeter> ()
+   (*/ 2 (: r) 31415927 10000000) )
+
+(dm draw> ()
+   (drawCircle (: x) (: y) (: r)) )
+\end{wideverbatim}
+
+Now we can experiment with geometrical shapes. We create a rectangle at
+point (0,0) with a width of 30 and a height of 20, and keep it in the
+variable \texttt{R}:
+
+
+\begin{wideverbatim}
+: (setq R (new '(+Rectangle) 0 0 30 20))  # New rectangle
+-> $134432824                             # returned anonymous symbol
+: (show R)
+$134432824 (+Rectangle)                   # Show the rectangle
+   dy 20
+   dx 30
+   y 0
+   x 0
+\end{wideverbatim}
+
+We see that the symbol \texttt{\$134432824} has a list of classes
+`\texttt{(+Rectangle)}' in its value cell, and the coordinates, width
+and height in is property list.
+
+Sending messages to that object
+
+
+\begin{wideverbatim}
+: (area> R)                               # Calculate area
+-> 600
+: (perimeter> R)                          # and perimeter
+-> 100
+\end{wideverbatim}
+
+will return the values for area and perimeter, respectively.
+
+Then we move the object's origin:
+
+
+\begin{wideverbatim}
+: (move> R 10 5)                          # Move 10 right and 5 down
+-> 5
+: (show R)
+$134432824 (+Rectangle)
+   y 5                                    # Origin changed (0,0) -> (10,5)
+   x 10
+   dy 20
+   dx 30
+\end{wideverbatim}
+
+Though a method \texttt{move>} wasn't defined for the \texttt{+Rectangle} class, it is
+inherited from the \texttt{+Shape} superclass.
+
+Similarly, we create and use a circle object:
+
+
+\begin{wideverbatim}
+: (setq C (new '(+Circle) 10 10 30))      # New circle
+-> $134432607                             # returned anonymous symbol
+: (show C)
+$134432607 (+Circle)                      # Show the circle
+   r 30
+   y 10
+   x 10
+-> $134432607
+: (area> C)                               # Calculate area
+-> 2827
+: (perimeter> C)                          # and perimeter
+-> 188
+: (move> C 10 5)                          # Move 10 right and 5 down
+-> 15
+: (show C)
+$134432607 (+Circle)                      # Origin changed (10,10) -> (20,15)
+   y 15
+   x 20
+   r 30
+\end{wideverbatim}
+
+It is also easy to send messages to objects in a list:
+
+
+\begin{wideverbatim}
+: (mapcar 'area> (list R C))              # Get list of areas
+-> (600 2827)
+: (mapc
+   '((Shape) (move> Shape 10 10))         # Move all 10 right and down
+   (list R C) )
+-> 25
+: (show R)
+$134431493 (+Rectangle)
+   y 15
+   x 20
+   dy 20
+   dx 30
+-> $134431493
+: (show C)
+$134431523 (+Circle)
+   y 25
+   x 30
+   r 30
+\end{wideverbatim}
+
+Assume that we want to extend our shape system. From time to time, we
+need shapes that behave exactly like the ones above, but are tied to a
+fixed position. That is, they do not change their position even if they
+receive a \texttt{move>} message.
+
+One solution would be to modify the \texttt{move>} method in the \texttt{+Shape} class
+to a no-operation. But this would require to duplicate the whole shape
+hierarchy (e.g. by defining \texttt{+FixedShape}, \texttt{+FixedRectangle} and
+\texttt{+FixedCircle} classes).
+
+The PicoLisp Way is the use of Prefix Classes through multiple
+inheritance. It uses the fact that searching for method definitions is a
+depth-first, left-to-right search of the class tree. We define a prefix
+class:
+
+
+\begin{wideverbatim}
+: (class +Fixed)
+
+(dm move> (DX DY))  # A do-nothing method
+\end{wideverbatim}
+
+We can now create a fixed rectangle, and try to move it:
+
+
+\begin{wideverbatim}
+: (setq R (new '(+Fixed +Rectangle) 0 0 30 20))    # '+Fixed' prefix class
+-> $134432881
+: (move> R 10 5)                                   # Send 'move>' message
+-> NIL
+: (show R)
+$134432881 (+Fixed +Rectangle)
+   dy 20
+   dx 30
+   y 0                                             # Did not move!
+   x 0
+\end{wideverbatim}
+
+We see, prefix classes can surgically change the inheritance tree for
+selected objects or classes.
+
+Alternatively, if fixed rectangles are needed often, it might make sense
+to define a new class \texttt{+FixRect}:
+
+
+\begin{wideverbatim}
+: (class +FixRect +Fixed +Rectangle)
+-> +FixRect
+\end{wideverbatim}
+
+and then use it directly:
+
+
+\begin{wideverbatim}
+: (setq R (new '(+FixRect) 0 0 30 20))
+-> $13455710
+\end{wideverbatim}
+
+ 
+\section{Persistence (External Symbols)}
+\label{sec:tut-persistence-(external-symbols)}
+
+
+PicoLisp has persistent objects built-in as a first class data type.
+With ``first class'' we mean not just the ability of being passed around,
+or returned from functions (that's a matter of course), but that they
+are a primary data type with their own interpreter tag bits. They are,
+in fact, a special type of symbolic atoms (called
+``\emph{External Symbols}''), that happen to be read from
+pool file(s) when accessed, and written back automatically when
+modified.
+
+In all other aspects they are normal symbols. They have a value cell, a
+property list and a name.
+
+The name cannot be directly controlled by the programmer, as it is
+assigned when the symbol is created. It is an encoded index of the
+symbol's location in its database file. In its visual representation
+(output by the \texttt{print} functions and input by the \texttt{read} functions) it
+is surrounded by braces.
+
+To make use of external symbols, you need to open a database first:
+
+
+\begin{wideverbatim}
+: (pool "test.db")
+\end{wideverbatim}
+
+If a file with that name did not exist, it got created now. Also created
+at the same moment was \texttt{\{1\}}, the very first symbol in the file. This
+symbol is of great importance, and is handled especially by PicoLisp.
+Therefore a global constant \texttt{*DB} exists, which points to that symbol
+\texttt{\{1\}}, which should be used exclusively to access the symbol \texttt{\{1\}}, and
+which should never be modified by the programmer.
+
+
+\begin{wideverbatim}
+: *DB                   # The value of '*DB'
+-> {1}                  # is '{1}'
+: (show *DB)
+{1} NIL                 # Value of '{1}' is NIL, property list empty
+\end{wideverbatim}
+
+Now let's put something into the value cell and property list of \texttt{\{1\}}.
+
+
+\begin{wideverbatim}
+: (set *DB "Hello world")  # Set value of '{1}' to a transient symbol (string)
+-> "Hello world"
+: (put *DB 'a 1)           # Property 'a' to 1
+-> 1
+: (put *DB 'b 2)           # Property 'b' to 2
+-> 2
+: (show *DB)               # Now show the symbol '{1}'
+{1} "Hello world"
+   b 2
+   a 1
+\end{wideverbatim}
+
+Note that instead of `\texttt{(set *DB "Hello world")}', we might also
+have written `\texttt{(setq {1} "Hello world")}', and instead of
+`\texttt{(put *DB 'a 1)}' we might have written `\texttt{(put '{1} 'a
+  1)}'. This would have the same effect, but as a rule external
+symbols should never be be accessed literally in application programs,
+because the garbage collector might not be able to free these symbols
+and all symbols connected to them (and that might well be the whole
+database). It is all right, however, to access external symbols
+literally during interactive debugging.
+
+Now we can create our first own external symbol. This can be done with
+\texttt{new} when a \texttt{T} argument is supplied:
+
+
+\begin{wideverbatim}
+: (new T)
+-> {2}               # Got a new symbol
+\end{wideverbatim}
+
+We store it in the database root \texttt{\{1\}}:
+
+
+\begin{wideverbatim}
+: (put *DB 'newSym '{2})   # Literal '{2}' (ok during debugging)
+-> {2}
+: (show *DB)
+{1} "Hello world"
+   newSym {2}              # '{2}' is now stored in '{1}'
+   b 2
+   a 1
+\end{wideverbatim}
+
+Put some property value into `\{2\}'
+
+
+\begin{wideverbatim}
+: (put *DB 'newSym 'x 777) # Put 777 as 'x'-property of '{2}'
+-> 777
+: (show *DB 'newSym)       # Show '{2}' (indirectly)
+{2} NIL
+   x 777
+-> {2}
+: (show '{2})              # Show '{2}' (directly)
+{2} NIL
+   x 777
+\end{wideverbatim}
+
+All modifications to - and creations of - external symbols done so far
+are not written to the database yet. We could call \texttt{rollback} (or simply
+exit PicoLisp) to undo all the changes. But as we want to keep them:
+
+
+\begin{wideverbatim}
+: (commit)           # Commit all changes
+-> T
+: (bye)              # Exit picolisp
+$                    # back to the shell
+\end{wideverbatim}
+
+So, the next time when ..
+
+
+\begin{wideverbatim}
+$ pil +                 # .. we start PicoLisp
+: (pool "test.db")      # and open the database file,
+-> T
+: (show *DB)            # our two symbols are there again
+{1} "Hello world"
+   newSym {2}
+   b 2
+   a 1
+-> {1}
+: (show *DB 'newSym)
+{2} NIL
+   x 777
+-> {2}
+\end{wideverbatim}
+
+ 
+\section{Database Programming}
+\label{sec:tut-database-programming}
+
+
+To a database, there is more than just persistence. PicoLisp includes an
+entity/relation class framework (see also \emph{Database})
+which allows a close mapping of the application data structure to the
+database.
+
+We provided a simple yet complete database and GUI demo application in
+\texttt{@doc/family.tgz} and \texttt{@doc/family64.tgz}. Please unpack the first one
+if you use a 32-bit system, and the second one on a 64-bit system. Both
+contain the sources in \texttt{@doc/family.l}, and an initial database in the
+``family/'' subdirectory.
+
+To use it, please unpack it first in your current working directory,
+then start it up in the following way:
+
+
+\begin{wideverbatim}
+$ pil family.l -main +
+:
+\end{wideverbatim}
+
+This loads the source file, initializes the database by calling the
+\texttt{main} function, and prompts for user input.
+
+The data model is small and simple. We define a class \texttt{+Person} and two
+subclasses \texttt{+Man} and \texttt{+Woman}.
+
+
+\begin{wideverbatim}
+(class +Person +Entity)
+\end{wideverbatim}
+
+\texttt{+Person} is a subclass of the \texttt{+Entity} system class. Usually all
+objects in a database are of a direct or indirect subclass of \texttt{+Entity}.
+We can then define the relations to other data with the \texttt{rel} function.
+
+
+\begin{wideverbatim}
+(rel nm (+Need +Sn +Idx +String))      # Name
+\end{wideverbatim}
+
+This defines the name property (\texttt{nm}) of a person. The first argument to
+\texttt{rel} is always a list of relation classes (subclasses of \texttt{+relation}),
+optionally followed by further arguments, causing relation daemon
+objects be created and stored in the class definition. These daemon
+objects control the entity's behavior later at runtime.
+
+Relation daemons are a kind of \emph{metadata}, controlling the interactions
+between entities, and maintaining database integrity. Like other
+classes, relation classes can be extended and refined, and in
+combination with proper prefix classes a fine-grained description of the
+application's structure can be produced.
+
+Besides primitive relation classes, like \texttt{+Number}, \texttt{+String} or
+\texttt{+Date}, there are
+
+\begin{itemize}
+\item relations between entities, like \texttt{+Link} (unidirectional link),
+   \texttt{+Joint} (bidirectional link) or \texttt{+Hook} (object-local index trees)
+\item relations that bundle other relations into a single unit (\texttt{+Bag})
+\item a \texttt{+List} prefix class
+\item a \texttt{+Blob} class for ``binary large objects''
+\item prefix classes that maintain index trees, like \texttt{+Key} (unique index),
+   \texttt{+Ref} (non-unique index) or \texttt{+Idx} (full text index)
+\item prefix classes which in turn modify index class behavior, like \texttt{+Sn}
+   (modified soundex algorithm~\cite{knuth73} for tolerant
+   searches)
+\item a \texttt{+Need} prefix class, for existence checks
+\item a \texttt{+Dep} prefix class controlling dependencies between other
+   relations
+\end{itemize}
+
+In the case of the person's name (\texttt{nm}) above, the relation object is of
+type \texttt{(+Need +Sn +Idx +String)}. Thus, the name of each person in this
+demo database is a mandatory attribute (\texttt{+Need}), searchable with the
+soundex algorithm (\texttt{+Sn}) and a full index (\texttt{+Idx}) of type \texttt{+String}.
+
+
+\begin{wideverbatim}
+(rel pa (+Joint) kids (+Man))          # Father
+(rel ma (+Joint) kids (+Woman))        # Mother
+(rel mate (+Joint) mate (+Person))     # Partner
+\end{wideverbatim}
+
+The attributes for \emph{father} (\texttt{pa}), \emph{Mother}
+(\texttt{ma}) and \emph{partner} (\texttt{mate}) are all defined as
+\texttt{+Joint}s. A \texttt{+Joint} is probably the most powerful
+relation mechanism in PicoLisp; it establishes a bidirectional link
+between two objects.
+
+The above declarations say that the \emph{father} (\texttt{pa}) attribute points to
+an object of type \texttt{+Man}, and is joined with that object's \texttt{kids}
+attribute (which is a list of joints back to all his children).
+
+The consistency of \texttt{+Joint}  is maintained automatically by the relation
+daemons. These become active whenever a value is stored to a person's
+\texttt{pa}, \texttt{ma}, \texttt{mate} or \texttt{kids} property.
+
+For example, interesting things happen when a person's \texttt{mate} is changed
+to a new value. Then the \texttt{mate} property of the old mate's object is
+cleared (she has no mate after that). Now when the person pointed to by
+the new value already has a mate, then that mate's \texttt{mate} property gets
+cleared, and the happy new two mates now get their joints both set
+correctly.
+
+The programmer doesn't have to care about all that. He just declares
+these relations as \texttt{+Joint} .
+
+The last four attributes of person objects are just static data:
+
+
+\begin{wideverbatim}
+(rel job (+Ref +String))               # Occupation
+(rel dat (+Ref +Date))                 # Date of birth
+(rel fin (+Ref +Date))                 # Date of death
+(rel txt (+String))                    # Info
+\end{wideverbatim}
+
+They are all searchable via a non-unique index (\texttt{+Ref}). Date values in
+PicoLisp are just numbers, representing the day number (starting first
+of March of the year zero).
+
+A method \texttt{url>} is defined:
+
+
+\begin{wideverbatim}
+(dm url> ()
+   (list "!person" '*ID This) )
+\end{wideverbatim}
+
+It is needed later in the GUI, to cause a click on a link to switch to
+that object.
+
+The classes \texttt{+Man} and \texttt{+Woman} are subclasses of \texttt{+Person}:
+
+
+\begin{wideverbatim}
+(class +Man +Person)
+(rel kids (+List +Joint) pa (+Person)) # Children
+
+(class +Woman +Person)
+(rel kids (+List +Joint) ma (+Person)) # Children
+\end{wideverbatim}
+
+They inherit everything from \texttt{+Person}, except for the \texttt{kids} attribute.
+This attribute joins with the \texttt{pa} or \texttt{ma} attribute of the child,
+depending on the parent's gender.
+
+That's the whole data model for our demo database application.
+
+It is followed by a call to \texttt{dbs} (``database sizes''). This call is
+optional. If it is not present, the whole database will reside in a
+single file, with a block size of 256 bytes. If it is given, it should
+specify a list of items, each having a number in its CAR, and a list in
+its CDR. The CARs taken together will be passed later to
+\emph{pool}, causing an individual database file with that
+size to be created. The CDRs tell what entity classes (if an item is a
+symbol) or index trees (if an item is a list with a class in its CAR and
+a list of relations in its CDR) should be placed into that file.
+
+A handful of access functions is provided, that know about database
+relationships and thus allows higher-level access modes to the external
+symbols in a database.
+
+For one thing, the B-Trees created and maintained by the index daemons
+can be used directly. Though this is rarely done in a typical
+application, they form the base mechanisms of other access modes and
+should be understood first.
+
+The function \texttt{tree} returns the tree structure for a given relation. To
+iterate over the whole tree, the functions \texttt{iter} and \texttt{scan} can be
+used:
+
+
+\begin{wideverbatim}
+(iter (tree 'dat '+Person) '((P) (println (datStr (get P 'dat)) (get P 'nm))))
+"1770-08-03" "Friedrich Wilhelm III"
+"1776-03-10" "Luise Augusta of Mecklenburg-Strelitz"
+"1797-03-22" "Wilhelm I"
+...
+\end{wideverbatim}
+
+They take a function as the first argument. It will be applied to all
+objects found in the tree (to show only a part of the tree, an optional
+begin- and end-value can be supplied), producing a simple kind of
+report.
+
+More useful is \texttt{collect}; it returns a list of all objects that fall
+into a range of index values:
+
+
+\begin{wideverbatim}
+: (collect 'dat '+Person (date 1982 1 1) (date 1988 12 31))
+-> ({2-M} {2-L} {2-E})
+\end{wideverbatim}
+
+This returns all persons born between 1982 and 1988. Let's look at them
+with \texttt{show}:
+
+
+\begin{wideverbatim}
+: (more (collect 'dat '+Person (date 1982 1 1) (date 1988 12 31)) show)
+{2-M} (+Man)
+   nm "William"
+   dat 724023
+   ma {2-K}
+   pa {2-J}
+   job "Heir to the throne"
+
+{2-L} (+Man)
+   nm "Henry"
+   dat 724840
+   ma {2-K}
+   pa {2-J}
+   job "Prince"
+
+{2-E} (+Woman)
+   nm "Beatrice"
+   dat 726263
+   ma {2-D}
+   job "Princess"
+   pa {2-B}
+\end{wideverbatim}
+
+If you are only interested in a certain attribute, e.g. the name, you
+can return it directly:
+
+
+\begin{wideverbatim}
+: (collect 'dat '+Person (date 1982 1 1) (date 1988 12 31) 'nm)
+-> ("William" "Henry" "Beatrice")
+\end{wideverbatim}
+
+To find a single object in the database, the function \texttt{db} is used:
+
+
+\begin{wideverbatim}
+: (db 'nm '+Person "Edward")
+-> {2-;}
+\end{wideverbatim}
+
+If the key is not unique, additional arguments may be supplied:
+
+
+\begin{wideverbatim}
+: (db 'nm '+Person "Edward"  'job "Prince"  'dat (date 1964 3 10))
+-> {2-;}
+\end{wideverbatim}
+
+The programmer must know which combination of keys will suffice to
+specify the object uniquely. The tree search is performed using the
+first value (``Edward''), while all other attributes are used for
+filtering. Later, in the \emph{Pilog} section, we will show how
+more general (and possibly more efficient) searches can be performed.
+
+ 
+\section{User Interface (GUI) Programming}
+\label{sec:tut-user-interface-(gui)-programming}
+
+
+The only types of GUI supported by the PicoLisp application server
+framework is either dynamically generated (but static by nature) HTML,
+or an interactive XHTML/CSS framework with the optional use of
+JavaScript.
+
+Before we explain the GUI of our demo database application, we present a
+minimal example for a plain HTML-GUI in \texttt{@doc/hello.l}. Start the
+application server as:
+
+
+\begin{wideverbatim}
+$ pil @lib/http.l -'server 8080 "@doc/hello.l"' -wait
+\end{wideverbatim}
+
+Now point your browser to the address `\url{http://localhost:8080}'. You
+should see a very simple HTML page. You can come back here with the
+browser's BACK button.
+
+You can call the page repeatedly, or concurrently with many clients if
+you like. To terminate the server, you have to send it a TERM signal
+(e.g. `\texttt{killall pil}'), or type the \texttt{Ctrl-C} key in the console window.
+
+In our demo database application, a single function \texttt{person} is
+responsible for the whole GUI. Again, please look at \texttt{@doc/family.l}.
+
+To start the database \emph{and} the application server, call:
+
+
+\begin{wideverbatim}
+$ pil family.l -main -go +
+\end{wideverbatim}
+
+As before, the database is opened with \texttt{main}. The function \texttt{go} is also
+defined in \texttt{@doc/family.l}:
+
+
+\begin{wideverbatim}
+(de go ()
+   (server 8080 "!person") )
+\end{wideverbatim}
+
+It starts the HTTP server listening on TCP port 8080 (we did a similar
+thing in our minimal GUI example above directly on the command line).
+Each connect to that port will cause the function \texttt{person} to be
+invoked.
+
+Again, point your browser to the address `\url{http://localhost:8080}'.
+
+You should see a new browser window with an input form created by the
+function \texttt{person}. We provided an initial database in ``family/[1--4]''.
+You can navigate through it by clicking on the pencil icons besides the
+input fields.
+
+The chart with the children data can be scrolled using the down (\texttt{v})
+and up (\texttt{\textasciicircum{}}) buttons.
+
+A click on the button ``Select'' below opens a search dialog. You can
+scroll through the chart as before. Again, a click on a pencil will jump
+to that person. You can abort the dialog with a click on the
+``Cancel''-button.
+
+The search fields in the upper part of the dialog allow a conjunctive
+search. If you enter ``Edward'' in the ``Name'' field and click ``Search'',
+you'll see all persons having the string ``Edward'' in their name. If you
+also enter ``Duke'' in the ``Occupation'' field, the result list will reduce
+to only two entries.
+
+To create a new person, press the ``New Man'' or ``New Woman'' button. A new
+empty form will be displayed. Please type a name into the first field,
+and perhaps also an occupation and birth date. Any change of contents
+should be followed by a press on the ``Done'' button, though any other
+button (also Scroll or Select-buttons) will also do.
+
+To assign a \emph{father} attribute, you can either type a name directly into
+the field (if that person already exists in the database and you know
+the exact spelling), or use the ``Set''-button (\texttt{->}) to the left of that
+field to open the search dialog. If you type in the name directly, your
+input must exactly match upper and lower case.
+
+Alternatively, you may create a new person and assign a child in the
+``Children'' chart.
+
+On the console where you started PicoLisp, there should a prompt have
+appeared just when the browser connected. You can debug the application
+interactively while it is running. For example, the global variable
+\texttt{*Top} always contains the top level GUI object:
+
+
+\begin{wideverbatim}
+: (show *Top)
+\end{wideverbatim}
+
+To take a look at the first field on the form:
+
+
+\begin{wideverbatim}
+: (show *Top 'gui 1)
+\end{wideverbatim}
+
+A production application would be started in a slightly different way:
+
+
+\begin{wideverbatim}
+$ pil family.l -main -go -wait
+\end{wideverbatim}
+
+In that case, no debug prompt will appear. In both cases, however, two
+\texttt{pil} processes will be running now. One is the initial server process
+which will continue to run until it is killed. The other is a child
+process holding the state of the GUI in the browser. It will terminate
+some time after the browser is closed, or when \texttt{(bye)} or a \texttt{Ctrl-D} is
+entered at the PicoLisp prompt.
+
+Now back to the explanation of the GUI function \texttt{person}:
+
+
+\begin{wideverbatim}
+(de person ()
+   (app)
+   (action
+      (html 0 (get (default *ID (val *DB)) 'nm) "@lib.css" NIL
+         (form NIL
+            (<h2> (<id> (: nm)))
+\end{wideverbatim}
+
+For an in-depth explanation of that startup code, please refer to the
+guide to \emph{PicoLisp Application Development}.
+
+All components like fields and buttons are controlled by \texttt{form}. The
+function \texttt{gui} creates a single GUI component and takes the type (a list
+of classes) and a variable number of arguments depending on the needs of
+these classes.
+
+
+\begin{wideverbatim}
+(gui '(+E/R +TextField) '(nm : home obj) 40 "Name")
+\end{wideverbatim}
+
+This creates a \texttt{+TextField} with the label ``Name'' and a length of 40
+characters. The \texttt{+E/R} (: Entity/Relation) prefix class connects that
+field to a database object, the \texttt{nm} attribute of a person in this case,
+so that the person's name is displayed in that text field, and any
+changes entered into that field are propagated to the database
+automatically.
+
+
+\begin{wideverbatim}
+(gui '(+ClassField) '(: home obj) '(("Male" +Man) ("Female" +Woman)))
+\end{wideverbatim}
+
+A \texttt{+ClassField} displays and changes the class of an object, in this
+case the person's sex from \texttt{+Man} to \texttt{+Woman} and vice versa.
+
+As you see, there is no place where explicit accesses to the database
+have to be programmed, no \texttt{select} or \texttt{update}. This is all encapsulated
+in the GUI components, mainly in the \texttt{+E/R} prefix class. The above
+function \texttt{person} is fully functional as we present it and allows
+creation, modification and deletion of person objects in the database.
+
+The two buttons on the bottom right generate simple reports:
+
+The first one shows all contemporaries of the person that is currently
+displayed, i.e. all persons who did not die before, or were not born
+after that person. This is a typical PicoLisp report, in that in
+addition to the report's HTML page, a temporary file may be generated,
+suitable for download (and import into a spread sheet), and from which a
+PDF can be produced for print-out.
+
+In PicoLisp, there is not a real difference between a plain HTML-GUI and
+a report. Again, the function \texttt{html} is used to generate the page.
+
+The second report is much simpler. It produces a recursive structure of
+the family.
+
+In both reports, links to the person objects are created which allow
+easy navigation through the database.
+
+ 
+\section{Pilog --- PicoLisp Prolog}
+\label{sec:tut-pilog-picolisp-prolog}
+
+
+This sections explains some cases of using Pilog in typical application
+programming, in combination with persistent objects and databases.
+Please refer to the \emph{Pilog} section of the PicoLisp
+Reference for the basic usage of Pilog.
+
+Again, we use our demo application \texttt{@doc/family.l} that was introduced
+in the \emph{Database Programming} section.
+
+Normally, Pilog is used either interactively to query the database
+during debugging, or in applications to generate export data and
+reports. In the following examples we use the interactive query
+front-end functions \texttt{?} and \texttt{select}. An application will use \texttt{goal} and
+\texttt{prove} directly, or use convenience functions like \texttt{pilog} or \texttt{solve}.
+
+All Pilog access to external symbols is done via the two predicates
+\texttt{db/3} and \texttt{select/3}.
+
+\begin{itemize}
+\item \texttt{db/3} corresponds to the Lisp-level functions \texttt{db} and \texttt{collect}, as
+   it derives its data from a single relation. It can be used for simple
+   database queries.
+\item \texttt{select/3} provides for self-optimizing parallel access to an
+   arbitrary number of relations. There is also a Lisp front-end
+   function \texttt{select}, for convenient calls to the Pilog \texttt{select}
+   predicate.
+\end{itemize}
+
+A predicate \texttt{show/1} is pre-defined for debugging purposes (a simple
+glue to the Lisp-level function \texttt{show}, see \emph{Browsing}).
+Searching with \texttt{db/3} for all persons having the string ``Edward'' in
+their name:
+
+
+\begin{wideverbatim}
+: (? (db nm +Person "Edward" @P) (show @P))
+{2-;} (+Man)
+   nm "Edward"
+   ma {2-:}
+   pa {2-A}
+   dat 717346
+   job "Prince"
+ @P={2-;}
+{2-1B} (+Man)
+   nm "Albert Edward"
+   kids ({2-1C} {2-1D} {2-1E} {2-1F} {2-1G} {2-1H} {2-1I} {2-g} {2-a})
+   job "Prince"
+   mate {2-f}
+   fin 680370
+   dat 664554
+ @P={2-1B}
+...               # more results
+\end{wideverbatim}
+
+To search for all persons with ``Edward'' in their name who are married to
+somebody with occupation ``Queen'':
+
+
+\begin{wideverbatim}
+: (? (db nm +Person "Edward" @P) (val "Queen" @P mate job) (show @P))
+{2-1B} (+Man)
+   mate {2-f}
+   nm "Albert Edward"
+   kids ({2-1C} {2-1D} {2-1E} {2-1F} {2-1G} {2-1H} {2-1I} {2-g} {2-a})
+   job "Prince"
+   fin 680370
+   dat 664554
+ @P={2-1B}
+-> NIL            # only one result
+\end{wideverbatim}
+
+If you are interested in the names of ``Albert Edward'''s children:
+
+
+\begin{wideverbatim}
+: (? (db nm +Person "Albert Edward" @P) (lst @K @P kids) (val @Kid @K nm))
+ @P={2-1B} @K={2-1C} @Kid="Beatrice Mary Victoria"
+ @P={2-1B} @K={2-1D} @Kid="Leopold George Duncan"
+ @P={2-1B} @K={2-1E} @Kid="Arthur William Patrick"
+ @P={2-1B} @K={2-1F} @Kid="Louise Caroline Alberta"
+ @P={2-1B} @K={2-1G} @Kid="Helena Augusta Victoria"
+ @P={2-1B} @K={2-1H} @Kid="Alfred Ernest Albert"
+ @P={2-1B} @K={2-1I} @Kid="Alice Maud Mary"
+ @P={2-1B} @K={2-g} @Kid="Victoria Adelaide Mary"
+ @P={2-1B} @K={2-a} @Kid="Edward VII"
+-> NIL
+\end{wideverbatim}
+
+\texttt{db/3} can do a direct index access only for a single attribute (\texttt{nm} of
+\texttt{+Person} above). To search for several criteria at the same time,
+\texttt{select/3} has to be used:
+
+
+\begin{wideverbatim}
+: (?
+   (select (@P)
+      ((nm +Person "Edward") (nm +Person "Augusta" pa))  # Generator clauses
+      (tolr "Edward" @P nm)                              # Filter clauses
+      (tolr "Augusta" @P kids nm) )
+   (show @P) )
+{2-1B} (+Man)
+   kids ({2-1C} {2-1D} {2-1E} {2-1F} {2-1G} {2-1H} {2-1I} {2-g} {2-a})
+   mate {2-f}
+   nm "Albert Edward"
+   job "Prince"
+   fin 680370
+   dat 664554
+ @P={2-1B}
+-> NIL
+\end{wideverbatim}
+
+\texttt{select/3} takes a list of generator clauses which are used to retrieve
+objects from the database, and a number of normal Pilog filter clauses.
+In the example above the generators are
+
+\begin{itemize}
+\item \texttt{(nm +Person "Edward")} to generate persons with ``Edward'' in their
+   names, and
+\item \texttt{(nm +Person "Augusta" pa)} to find persons with ``Augusta'' in their
+   names and generate persons using the \texttt{pa} (``father'') attribute.
+\end{itemize}
+
+All persons generated are possible candidates for our selection. The
+\texttt{nm} index tree of \texttt{+Person} is traversed twice in parallel, optimizing
+the search in such a way that successful hits get higher priority in the
+search, depending on the filter clauses. The process will stop as soon
+as any one of the generators is exhausted. Note that this is different
+from the standard Prolog search algorithm.
+
+The filter clauses in this example both use the pre-defined predicate
+\texttt{tolr/3} for \emph{tolerant} string matches (according either to the soundex
+algorithm (see the section \emph{Database Programming}) or to
+substring matches), and filter objects that
+
+\begin{itemize}
+\item match ``Edward'' in their name: \texttt{(tolr "Edward" @P nm)}, and
+\item match ``Augusta'' in one of their kids' names:
+   \texttt{(tolr "Augusta" @P kids nm)}
+\end{itemize}
+
+A more typical and extensive example for the usage of \texttt{select} can be
+found in the \texttt{qPerson} function in \texttt{@doc/family.l}. It is used in the
+search dialog of the demo application, and searches for a person with
+the name, the parents' and partner's names, the occupation and a time
+range for the birth date. The relevant index trees in the database are
+searched (actually only those trees where the user entered a search key
+in the corresponding dialog field), and a logical AND of the search
+attributes is applied to the result.
+
+For example, press the ``Select'' button, enter ``Elizabeth'' into the
+``Mother'' search field and ``Phil'' in the ``Partner'' search field, meaning
+to look for all persons whose mother's name is like ``Elizabeth'' and
+whose partner's name is like ``Phil''. As a result, two persons
+(``Elizabeth II'' and ``Anne'') will show up.
+
+In principle, \texttt{db/3} can be seen as a special case of \texttt{select/3}. The
+following two queries are equivalent:
+
+
+\begin{wideverbatim}
+: (? (db nm +Person "Edward" @P))
+ @P={2-;}
+ @P={2-1B}
+ @P={2-R}
+ @P={2-1K}
+ @P={2-a}
+ @P={2-T}
+-> NIL
+: (? (select (@P) ((nm +Person "Edward"))))
+ @P={2-;}
+ @P={2-1B}
+ @P={2-R}
+ @P={2-1K}
+ @P={2-a}
+ @P={2-T}
+-> NIL
+\end{wideverbatim}
+
+ 
+\section{Poor Man's SQL}
+\label{sec:tut-poor-mans-sql}
+
+
+ 
+\subsection{select}
+\label{sec:tut-select}
+
+
+For convenience, a \texttt{select} Lisp glue function is provided as a
+front-end to the \texttt{select} predicate. Note that this function does not
+evaluate its arguments (it is intended for interactive use), and that it
+supports only a subset of the predicate's functionality. The syntax
+resembles SELECT in the SQL language, for example:
+
+
+\begin{wideverbatim}
+# SELECT * FROM Person
+: (select +Person)  # Step through the whole database
+{2-o} (+Man)
+   nm "Adalbert Ferdinand Berengar Viktor of Prussia"
+   dat 688253
+   ma {2-j}
+   pa {2-h}
+   fin 711698
+
+{2-1B} (+Man)
+   nm "Albert Edward"
+   dat 664554
+   job "Prince"
+   mate {2-f}
+   kids ({2-1C} {2-1D} {2-1E} {2-1F} {2-1G} {2-1H} {2-1I} {2-g} {2-a})
+   fin 680370
+...
+\end{wideverbatim}
+
+
+\begin{wideverbatim}
+# SELECT * FROM Person WHERE nm LIKE "%Edward%"
+: (select +Person nm "Edward")  # Show all Edwards
+{2-;} (+Man)
+   nm "Edward"
+   dat 717346
+   job "Prince"
+   ma {2-:}
+   pa {2-A}
+
+{2-1B} (+Man)
+   nm "Albert Edward"
+   dat 664554
+   job "Prince"
+   kids ({2-1C} {2-1D} {2-1E} {2-1F} {2-1G} {2-1H} {2-1I} {2-g} {2-a})
+   mate {2-f}
+   fin 680370
+...
+
+# SELECT nm, dat FROM Person WHERE nm LIKE "%Edward%"
+: (select nm dat +Person nm "Edward")
+"Edward" "1964-03-10" {2-;}
+"Albert Edward" "1819-08-26" {2-1B}
+"George Edward" NIL {2-R}
+"Edward Augustus Hanover" NIL {2-1K}
+...
+
+# SELECT dat, fin, p1.nm, p2.nm
+#    FROM Person p1, Person p2
+#    WHERE p1.nm LIKE "%Edward%"
+#    AND p1.job LIKE "King%"
+#    AND p1.mate = p2.mate  -- Actually, in a SQL model we'd need
+#                           -- another table here for the join
+: (select dat fin nm (mate nm) +Person nm "Edward" job "King")
+"1894-06-23" "1972-05-28" "Edward VIII" "Wallace Simpson" {2-T}
+"1841-11-09" NIL "Edward VII" "Alexandra of Denmark" {2-a}
+-> NIL
+\end{wideverbatim}
+
+ 
+\subsection{update}
+\label{sec:tut-update}
+
+
+In addition (just to stay with the SQL terminology ;-), there is also an
+\texttt{update} function. It is a front-end to the \texttt{set!>} and \texttt{put!>}
+transaction methods, and should be used when single objects in the
+database have to be modified by hand.
+
+In principle, it would also be possible to use the \texttt{edit} function to
+modify a database object. This is not recommended, however, because
+\texttt{edit} does not know about relations to other objects (like Links,
+Joints and index trees) and may easily cause database corruption.
+
+In the most general case, the value of a property in a database object
+is changed with the \texttt{put!>} method. Let's look at ``Edward'' from the
+previous examples:
+
+
+\begin{wideverbatim}
+: (show '{2-;})
+{2R} (+Man)
+   job "Prince"
+   nm "Edward"
+   dat 717346
+   ma {2-:}
+   pa {20A}
+-> {2-;}
+\end{wideverbatim}
+
+We might change the name to ``Johnny'' with \texttt{put!>}:
+
+
+\begin{wideverbatim}
+: (put!> '{2-;} 'nm "Johnny")
+-> "Johnny"
+\end{wideverbatim}
+
+However, an easier and less error-prone prone way - especially when more
+than one property has to be changed - is using \texttt{update}. It presents the
+value cell (the list of classes) and then each property on its own line,
+allowing the user to change it with the \emph{command line editor}.
+
+Just hitting ENTER will leave that property unchanged. To modify it,
+you'll typically hit ESC to get into command mode, and move the cursor
+to the point of change.
+
+For properties with nested list structures (\texttt{+List +Bag}), \texttt{update} will
+recurse into the data structure.
+
+
+\begin{wideverbatim}
+: (update '{2-;})
+{2-;} (+Man)      # ENTER
+nm "Johnny"       # Modified the name to "Johnny"
+ma {2-:}          # ENTER
+pa {2-A}          # ENTER
+dat 1960-03-10    # Modified the year from "1964" to "1960"
+job "Prince"      # ENTER
+-> {2-;}
+\end{wideverbatim}
+
+All changes are committed immediately, observing the rules of database
+synchronization so that any another user looking at the same object will
+have his GUI updated correctly.
+
+To abort \texttt{update}, hit \texttt{Ctrl-X}.
+
+If only a single property has to be changed, \texttt{update} can be called
+directly for that property:
+
+
+\begin{wideverbatim}
+: (update '{2-;} 'nm)
+{2-;} nm "Edward"
+...
+\end{wideverbatim}
+
+ 
+% \section{References}
+% \label{sec:tut-references}
+
+\begin{thebibliography}{[9]}
+
+\bibitem{knuth73} Donald E. Knuth: ``The Art of Computer Programming'', Vol.3,
+Addison-Wesley, 1973, p. 392
+
+\end{thebibliography}
+
+
+

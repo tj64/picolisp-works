@@ -1,0 +1,109 @@
+\title{The many uses of @ in PicoLisp}
+\input{mainmatter/authors/thorsten}
+\maketitle
+
+% 16jul12
+% Alexander Burger
+
+% \documentclass[10pt,a4paper]{article}
+% \usepackage{graphicx}
+
+% \textwidth 1.4\textwidth
+% \textheight 1.125\textheight
+% \oddsidemargin 0em
+% \evensidemargin 0em
+% \headsep 0em
+% \parindent 0em
+% \parskip 6pt
+
+% \title{The many uses of @ in PicoLisp}
+% \author{Thorsten Jolitz\\tj@data-driven.de}
+% \date{2011-11-09}
+
+% \begin{document}
+% \maketitle
+
+
+\begin{abstract}
+  This article gives an overview over the many uses of \texttt{@} in
+  PicoLisp.
+\end{abstract}
+
+\section{The \texttt{@} mark in PicoLisp}
+\label{sec:at-mark-the-at-mark-in-picolisp}
+
+The \emph{AT-mark} \texttt{@} is everywhere in PicoLisp source code, and
+sometimes it is not obvious, at least for beginners, what the meaning
+of \texttt{@} in the context at hand is.
+
+Here is a table that summarizes all uses of \texttt{@} in PicoLisp,
+giving examples and explanations, as well as links to related docs
+with more information. It is probably necessary to read the docs first
+to understand the compact information in the table. This summary
+serves only as a quick overview, helping to find out the context and
+meaning of an otherwise mysterious \texttt{@} mark in some PicoLisp
+code.
+
+
+\begin{wideverbatim}
+                    All (?) possible uses of @ with examples and explanations
++------------------------------------------------------------------------------------------------+
+|     context     |        use         |                meaning                |    reference    |
+|-----------------+--------------------+---------------------------------------+-----------------|
+| CAR of a lambda |                    | all arguments are evaluated and kept  | http://         |
+| expression      | (de foo @ ...)     | internally in a list                  | software-lab.de |
+|                 |                    |                                       | /doc/ref.html   |
+|-----------------+--------------------+---------------------------------------+-----------------|
+|                 |                    | the result of the last (3) evaluation | http://         |
+| read-eval-loops | (- @ @@ @@@)       | (s) stored in the VAL of symbol       | software-lab.de |
+|                 |                    |                                       | /doc/ref.html   |
+|-----------------+--------------------+---------------------------------------+-----------------|
+| flow- and logic | (while (read)      |                                       |                 |
+| functions with  | (println @)), (and | store result of (the last)            | http://         |
+| conditional     | and (@ (min @ 5)   | conditional expression                | software-lab.de |
+| expressions     | (prinl @) (gt0     |                                       | /doc/ref.html   |
+|                 | (dec @)) .))       |                                       |                 |
+|-----------------+--------------------+---------------------------------------+-----------------|
+| flow- and logic | (case @ ("^M" NIL) |                                       | http://         |
+| functions with  | ("^J" "^M") (T @)  | store result of controlling           | software-lab.de |
+| controlling     | )                  | expression                            | /doc/ref.html   |
+| expressions     |                    |                                       |                 |
+|-----------------+--------------------+---------------------------------------+-----------------|
+| 'match' and     | (match '(@A Zeit)  |                                       | http://         |
+| 'fill'          | '(Keine))          | Pattern Wildcard                      | software-lab.de |
+|                 |                    |                                       | /doc/ref.html   |
+|-----------------+--------------------+---------------------------------------+-----------------|
+|                 |                    | replacing all occurrences of an       | http://         |
+|                 | (text "abc @1 def  | at-mark "@", followed by one of the   | software-lab.de |
+| 'text'          | @2" 'XYZ 123)      | letters "1" through "9", and "A"      | /doc/refT.html# |
+|                 |                    | through "Z", with the corresponding   | text            |
+|                 |                    | any argument.                         |                 |
+|-----------------+--------------------+---------------------------------------+-----------------|
+|                 | (load "@lib/       |                                       | http://         |
+| path names      | misc.l")           | home directory substitution           | software-lab.de |
+|                 |                    |                                       | /doc/tut.html   |
+|-----------------+--------------------+---------------------------------------+-----------------|
+|                 | (be likes (John    |                                       | http://         |
+| Pilog           | @X))               | Pilog variable                        | software-lab.de |
+|                 |                    |                                       | /doc/ref.html   |
+|-----------------+--------------------+---------------------------------------+-----------------|
+|                 | (be likes (John    |                                       | http://         |
+| Pilog           | @))                | Anonymous Pilog variable              | software-lab.de |
+|                 |                    |                                       | /doc/ref.html   |
+|-----------------+--------------------+---------------------------------------+-----------------|
+|                 | (native "@"        | (64-bit version only) Calls a native  | http://         |
+| shared object   | "getenv" 'S        | C function. The first argument should | software-lab.de |
+| libraries       | "TERM") # Same as  | specify a shared object library, e.g. | /doc/refN.html# |
+|                 | (sys "TERM")       | "@" (here @ as transient symbol       | native          |
+|                 |                    | stands for the current main program). |                 |
++------------------------------------------------------------------------------------------------+
+
+
+\end{wideverbatim}
+
+% \end{document}
+
+% Local variables:
+% mode: latex
+% TeX-master: "../../editor.tex"
+% End:

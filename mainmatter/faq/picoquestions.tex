@@ -1,0 +1,182 @@
+\title{Some technical questions and answers}
+\input{mainmatter/authors/alex}
+\maketitle
+
+\begin{abstract}
+  These are some technical questions about PicoLisp with answers,
+  additional to the official FAQ.
+\end{abstract}
+
+
+\section{Can there be more than one copy of the symbol \textbf{T}?}
+\label{sec:tj-fix-labels-some-technical-questions-and-answers}
+
+\paragraph{Question}
+\label{sec:dfs}
+
+\textbf{NIL} is a special symbol which exists exactly once in the whole system.
+Can there be more than one copy of the symbol \textbf{T}?
+
+
+\paragraph{Answer}
+\label{sec:dfs}
+
+In this sense, \textit{any} internal symbol is unique, and exists exactly once
+in the system. And any internal symbol (also 'NIL') could exist a second time,
+but it cannot be interned at the same time (and would thus be a transient
+symbol).
+
+``interned'' means no more or less that an entry in the ``internal'' symbol table
+points to that symbol.
+
+'NIL' is special, however, because even if you would succeed to intern a new
+(transient) symbol ``NIL'' (it isn't possible, as the existing 'NIL' cannot be
+uninterned), it would not have the speciality of the old 'NIL', e.g. being
+returned from boolean functions, because these functions return a hard-compiled
+pointer to the old 'NIL', and conditionals check for this pointer.
+
+Take a normal symbol, say ``abc''. You can create several transient symbols ``abc''
+in the system, for example by loading them from different source files, or
+separating the input with (====), by 'pack'ing them and so on.
+
+Now you could 'intern' one of those ``abc'' symbols. It will appear as 'abc'. The
+reader will always return that interned symbol when it sees 'abc'. A call to
+(intern ``abc'') also would return that already-interned symbol 'abc'. To change
+another one of the above ``abc'' symbols to 'abc', you'll first have to unintern
+(with 'zap') the existing 'abc'.
+
+
+\section{Why is the symbol \textbf{T} not protected like \textbf{NIL}?}
+\label{sec:sfs}
+
+\paragraph{Question}
+\label{sec:dfs}
+
+(Related to the one above) If one tries to put a property on the
+\textbf{NIL} symbol, one gets the message ``NIL -- Protected symbol``.
+Why is the symbol \textbf{T} not protected likewise?
+
+\paragraph{Answer}
+\label{sec:dfs}
+
+Perhaps is this error message not necessary, at least not in the 64-bit version.
+For a background, see the structure of 'NIL' in ``doc/structures``:
+
+\begin{wideverbatim}
+      NIL:  /
+            |
+            V
+      +-----+-----+-----+-----+
+      |  /  |  /  |  /  |  /  |
+      +-----+--+--+-----+-----+
+\end{wideverbatim}
+
+'NIL' is the only symbol that has a double nature: It is a symbol \textit{and} a cons pair.
+It doesn't even have a name in the 32-bit version, the reader and printer simply
+know about it, and read and print 'N', 'I', and 'L' by themselves.
+
+In the 64-bit version the situation is slightly different:
+\begin{wideverbatim}
+      NIL:  /
+            |
+            V
+      +-----+-----+-----+-----+
+      |'LIN'|  /  |  /  |  /  |
+      +-----+--+--+-----+-----+
+\end{wideverbatim}
+
+Here NIL \textit{does} have a name. This field where you see the letters 'N', 'I' and
+'L' here, is called the symbol's tail. Besides the name, it can also hold a
+property list.
+
+Technically, there is perhaps no problem when storing also properties in that
+tail of 'NIL', and it might work (at least on the 64-bit version) if we removed
+the above error message.
+
+However, I think it is wise to prohibit properties in 'NIL', as ``NIL'' also means
+``nothing'', and storing properties in ``nothing'' sounds a bit sick.
+
+Any opinions?
+
+\section{Why does the REPL exit when \textbf{NIL} is typed?}
+\label{sec:fsl}
+
+
+\paragraph{Question}
+\label{sec:dfs}
+
+If you type just ``NIL'' or ``()'' on the command line in the REPL,
+then the REPL exits. Why is that?
+
+
+\paragraph{Answer}
+\label{sec:dfs}
+
+The REPL is basically
+
+\begin{wideverbatim}
+   (while (read)
+      (eval @) )
+\end{wideverbatim}
+
+'read' returns 'NIL' upon end of file, but also when it indeed \textit{reads} 'NIL'.
+
+The same happens btw if you write the atom 'NIL' somewhere in a 'load'ed file.
+This is a convenient way to ``comment'' the rest of the file.
+
+Even better is \textit{conditional commenting} of the rest of a file, by using
+a backquote read macro. When `(condition) is read, the rest of the file
+will be ignored if (condition) evaluates to 'NIL'. There are examples
+for that in the sources, e.g. at the end of ``lib/form.l``, where `*Dbg causes
+the rest of the file to be loaded only if in debugging mode.
+
+\emph{Note:} As of picoLisp-3.0.6, the interpreter does no longer exit
+when the top level REPL reads NIL. This is a bit inconsistent, but
+more what seems to be expected by most people.
+
+
+\section{PicoLisp indicated that 'be' was undefined - why?}
+\label{sec:dsfs}
+
+\paragraph{Question}
+\label{sec:dfs}
+
+At this URL
+(\underline{http://rosettacode.org/wiki/Pascal\%27s\_triangle/Puzzle\#PicoLisp}\footnote{http://rosettacode.org/wiki/Pascal\%27s\_triangle/Puzzle\#PicoLisp})
+there is some PicoLisp code for solving Pascal's triangle. I tried it
+out on my machine and PicoLisp indicated that 'be' was undefined.
+Where would I find it? I'm running version 3.0.4 on a Windows 7 Home
+Premium 64-bit system.
+
+\paragraph{Answer}
+\label{sec:dfs}
+
+This is most probably because you didn't load the full system, but
+just the 'picolisp' binary perhaps.
+
+Normally, PicoLisp is either started locally with the 'p' or 'dbg' scripts:
+\begin{wideverbatim}
+   $ ./p +
+   :
+\end{wideverbatim}
+
+or globally (e.g. when installed via some package) with the 'pil' command:
+\begin{wideverbatim}
+   $ pil +
+   :
+\end{wideverbatim}
+
+In both cases, the full system is loaded. The trailing '+' indicates
+debug mode.
+\begin{wideverbatim}
+   : (pp 'be)
+   (de be CL
+      (with (car CL)
+         (if (== *Rule This)
+            (=: T (conc (: T) (cons (cdr CL))))
+            (=: T (cons (cdr CL)))
+            (setq *Rule This) )
+         This ) )
+   -> be
+\end{wideverbatim}
+

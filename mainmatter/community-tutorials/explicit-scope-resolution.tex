@@ -1,0 +1,162 @@
+\title{Explicit Scope Resolution in PicoLisp}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+\begin{abstract}
+  This article describes how to use explicit scope resolution with
+  \texttt{run} and \texttt{eval} when extending the \texttt{html}
+  function with some arbitrary code as final argument. 
+\end{abstract}
+
+\section{Extending the \texttt{html} function}
+\label{sec:expl-scope-res-extending-the-html}
+
+Today I felt like extending the \textbf{html} function that is responsible for
+rendering the bare bones of a HTML document in the GUI framework.
+
+Normally a call to (\texttt{html}) looks something like:
+
+\begin{wideverbatim}
+(html 0 "Pico Admin" *CSS NIL
+  (Some code here)
+  (Some more code here) ... )
+\end{wideverbatim}
+
+The important thing is the fact that the function accepts some arbitrary
+code(s) as the final argument. I wanted to simply hard code my stuff
+into an ``extension'', like this:
+
+
+\begin{wideverbatim}
+(de pa-html Prg
+  (html 0 "Pico Admin" *CSS NIL Prg))
+\end{wideverbatim}
+
+Calling the above is shorter than the original with the same arguments
+over and over again and \texttt{Prg} is now the arbitrary code I
+referred to above.
+
+\section{ \texttt{FEXPR}s and scoping rules}
+\label{sec:expl-scope-res-fexpr}
+
+
+It wouldn't work though, what was going on? Well the answer is obvious
+when you get some help and think a little about it. In our
+\textbf{(pa-html)} above the \textbf{Prg} variable is a
+\href{http://en.wikipedia.org/wiki/Fexpr}{FEXPR}; unevaluated code.
+With our addition we add a new scope, the local scope of
+(\texttt{pa-html}). It turns out that (\texttt{html}) doesn't expect
+the code to come from this local scope, a lot of variables that are
+defined in the scope calling (\texttt{pa-html}) are probably undefined
+within the local scope of (\texttt{pa-html}) for instance. Hence the
+massive crashing.
+
+To understand the solution, let's start over from the beginning with the
+\textbf{(up)} function:
+
+\begin{wideverbatim}
+(let Hello "Hello"
+  (println Hello)
+  (let Hello "Hi!"
+     (println Hello)
+     (let Hello "Greetings"
+        (println Hello)
+        (println (up Hello)))))
+\end{wideverbatim}
+
+Output:
+
+\begin{wideverbatim}
+"Hello"
+"Hi!"
+"Greetings"
+"Hi!"
+\end{wideverbatim}
+
+So the call to (\texttt{up}) will check what \textbf{Hello} contained
+in the scope above the scope that it was called in. In this case
+``Hi!'' was the contents. If I say that the default value for
+(\texttt{up}) is 1 you can probably figure out what the last
+(\texttt{println}) would've printed had we passed it \texttt{(up 2
+  Hello)} instead.
+
+
+\section{Explicit scoping with  \texttt{run} and \texttt{eval}}
+\label{sec:expl-scope-res-explicit-scoping-with-run}
+
+\subsection{Using \texttt{run}}
+\label{sec:expl-scope-res-using-run}
+
+Both (\textbf{run}) and (\textbf{eval}) can accept a last optional
+argument that will define their scope explicitly, let's start with
+(\texttt{run}):
+
+
+\begin{wideverbatim}
+(de Lvl1 (Arg . Prg)
+  (let Lvl "lvl: 1"
+     (run Prg 1)))
+
+(de Lvl2 ()
+  (let Lvl "lvl: 2"
+     (Lvl1 "some argument"
+        (println Lvl) (println "Something more here") ) ) )
+  
+(Lvl2)
+\end{wideverbatim}
+
+Output:
+
+\begin{wideverbatim}
+"lvl: 2"
+"Something more here"
+\end{wideverbatim}
+
+As you can see \textbf{(run Prg 1)} will run \textbf{Prg} within the scope of
+(\textbf{Lvl2}), ``one up''. I think you can guess what the output would be if we
+just did \textbf{(run Prg)}.
+
+By this point you should be able to understand that
+
+
+\begin{wideverbatim}
+(de pa-html Prg
+  (html 0 "Pico Admin" *CSS NIL (run Prg 1)))
+\end{wideverbatim}
+
+is how (\texttt{pa-html}) should look.
+
+
+\subsection{Using \texttt{eval}}
+\label{sec:expl-scope-res-using-eval}
+
+Let's finish off with (\texttt{eval}) for good measure:
+
+\begin{wideverbatim}
+(de Lvl1 (Arg Lst)
+  (let Lvl "lvl1"
+     (eval Lst 1)))
+  
+(de Lvl2 ()
+  (let Lvl "lvl2"
+     (Lvl1 "I'm Arg" '(pack Arg " and I'm: " Lvl))))
+  
+(Lvl2)
+\end{wideverbatim}
+
+Output:
+
+\begin{wideverbatim}
+" and I'm: lvl2"
+\end{wideverbatim}
+
+Since \textbf{Arg} is undefined within the scope of (\textbf{Lvl2}) we
+won't get ``I'm Arg'' in the beginning of the output. Just calling
+\texttt{(eval Lst)} would of course result in “\texttt{I'm Arg and
+  I'm: lvl1}″.
+
+I think it's a bad idea to rely on explicit scope resolution out of
+laziness, as you can imagine the code could easily become unintelligible
+if not used sparingly. Use only when absolutely necessary if you can not
+see any other solution.
+

@@ -1,0 +1,64 @@
+\title*{Calling Ruby Scripts from PicoLisp}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+\section{Calling Ruby scripts from Pico Lisp}
+\label{sec:calling-ruby-scripts}
+
+I give up. There you have it, the confession. Too much basic stuff is
+lacking from Pico, as you might know we've covered both a way of
+\href{http://www.prodevtips.com/2008/07/01/regular-expressions-in-pico-lisp/}{matching} a la PHP's preg\_match and \href{http://www.prodevtips.com/2008/09/11/pico-lisp-and-json/}{JSON.} I've realized however that
+I'm never gonna be finished creating a proper application doing it in
+100\% Pico.
+
+I'm throwing in the towel and will create pure Pico Lisp libs on a per
+needed basis, when calling Ruby scripts is not fast enough for example.
+
+Why not go 100\% Ruby then? Well we've found the Holy Grail here, the
+Pico Lisp OODB system + GUI framework. I'm not going to give up on that
+easily.
+
+Here's an example of how to do it anyway, the Pico call:
+
+
+\begin{wideverbatim}
+(println 
+  (pipe 
+     (call 'ruby "projects/rss-reader/htmldecode.rb" "It&#8217;s a lovely world") (line)))
+\end{wideverbatim}
+
+\textbf{Update:} The above interfered with the server, preventing further
+output, bummer, the below version using (\textbf{in}) works OK though:
+
+
+\begin{wideverbatim}
+(println
+     (in (list 'ruby "projects/rss-reader/htmldecode.rb" Str) (line)))
+\end{wideverbatim}
+
+The Ruby part:
+
+
+\begin{wideverbatim}
+require 'rubygems'
+require 'htmlentities'
+coder = HTMLEntities.new
+puts coder.decode(ARGV[0])
+\end{wideverbatim}
+
+The output:
+
+
+\begin{wideverbatim}
+("I" "t" "’" "s" " " "a" " " "l" "o" "v" "e" "l" "y" " " "w" "o" "r" "l" "d")
+\end{wideverbatim}
+
+Great, we can move on and actually get something done here.
+
+This entry was posted on Saturday, October 4th, 2008 at 4:46 am 
+
+
+% Local variables:
+% mode: latex
+% TeX-master: "../../editor.tex"
+% End:

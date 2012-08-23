@@ -1,0 +1,184 @@
+\title{Ersatz PicoLisp Java Reflection API}
+\input{mainmatter/authors/alex}
+\maketitle
+
+\begin{abstract}
+This article introduces the \emph{Ersatz PicoLisp Java Reflection API}
+and its most important functions. 
+\end{abstract}
+
+\section{Introduction}
+\label{sec:ersatz-java-reflection-introduction}
+
+As Ersatz Lisp (available in the ``ersatz/'' directory in the Picolisp
+\href{http://software-lab.de/picoLisp.tgz}{release}, or as a separate
+\href{http://software-lab.de/ersatz.tgz}{tarball}) is completely
+written in Java, it comes with a set of dedicated functions to
+interface to the Java Reflection API.
+
+
+\section{Important functions}
+\label{sec:ersatz-java-reflection-important-functions}
+
+
+\subsection{The \texttt{java} function}
+\label{sec:ersatz-java-reflection-the-java-function}
+
+The central function is \texttt{java}. It comes in four forms:
+
+\begin{wideverbatim}
+ (java `cls `T ['any ..]) -> obj
+\end{wideverbatim}
+
+is a constructor call, returning a Java object. \texttt{cls} is the
+name of a Java class. The optional \texttt{any} arguments are passed
+to the Java constructor.
+
+\begin{wideverbatim}
+ (java `cls `msg ['any ..]) -> obj
+\end{wideverbatim}
+
+calls a static method \texttt{msg} for a class \texttt{cls}.
+
+\begin{wideverbatim}
+ (java `obj `msg ['any ..]) -> obj
+\end{wideverbatim}
+
+calls a dynamic method \texttt{msg} for an object \texttt{obj}. The
+optional any arguments to the above three forms can be
+
+\begin{itemize}
+\item T or NIL, then the type passed to Java is boolean
+\item A number, then it must fit in 32 bits and will be passed as int
+\item A normal symbol, then it will be passed as String
+\item A Java object, as returned by java or one of the xxx: conversion
+   functions (see below).
+\item A list, then all elements must be of the same type and will be passed
+   as Array.
+\end{itemize}
+
+
+\begin{wideverbatim}
+(java `obj ['cnt]) -> any
+\end{wideverbatim}
+
+converts a Java object to the corresponding Lisp type. Supported
+types, and their conversion results are:
+
+\begin{itemize}
+\item Boolean objects are converted to T or NIL
+\item Byte, Character, Integer, Long or BigInteger objects are converted to
+   numbers
+\item Double objects are converted to fixnums, using the scale cnt
+\item String objects are converted to transient symbols
+\item Arrays of byte, char, int or long are converted to lists of numbers
+\item Arrays of double are converted lists of fixnums, using the scale cnt
+\end{itemize}
+
+Example:
+
+\begin{wideverbatim}
+: (setq Sb (java "java.lang.StringBuilder" T "abc"))
+-> $StringBuilder
+: (java Sb "append" (char: 44))
+-> $StringBuilder
+: (java Sb "append" 123)
+-> $StringBuilder
+: (java Sb "toString")
+-> $String
+: (java @)
+-> "abc,123"
+\end{wideverbatim}
+
+
+\begin{wideverbatim}
+: (setq S (java "java.lang.String" T "abcde"))
+-> $String
+: (java (java S "getBytes"))
+-> (97 98 99 100 101)
+\end{wideverbatim}
+
+
+\begin{wideverbatim}
+: (java "java.lang.String" T (mapcar byte: (100 101 102)))
+-> $String
+: (java @)
+-> "def"
+\end{wideverbatim}
+
+\subsection{The \texttt{public} function}
+\label{sec:ersatz-java-reflection-the-public-function}
+
+To access public fields in Java objects or classes, public can be
+used:
+
+\begin{wideverbatim}
+ (public `obj `any ['any ..]) -> obj
+\end{wideverbatim}
+
+Returns the value of a public field any in object obj.
+
+\begin{wideverbatim}
+ (public `cls `any ['any ..]) -> obj
+\end{wideverbatim}
+
+Returns the value of a public field \texttt{any} in class
+\texttt{cls}. In both forms, the optional \texttt{any} arguments will in turn
+access corresponding fields in the object retrieved so far.
+
+Example:
+
+\begin{wideverbatim}
+: (public "java.lang.System" "err")
+-> $PrintStream
+: (java @ "println" "Hello world")
+Hello world
+-> NIL
+\end{wideverbatim}
+
+\subsection{The \texttt{interface} function}
+\label{sec:ersatz-java-reflection-the-interface-function}
+
+To create an interface object:
+
+\begin{wideverbatim}
+ (interface `cls|lst `sym `fun ..) -> obj
+\end{wideverbatim}
+
+Creates an interface, i.e. a set of methods for a class \texttt{cls} (or a list
+of classes \texttt{lst}).
+
+Example:
+
+\begin{wideverbatim}
+#!ersatz/pil
+(let
+   (Frame (java "javax.swing.JFrame" T "Bye-Frame")
+      Button (java "javax.swing.JButton" T "OK") )
+   (java Frame "add" "South" Button)
+   (java Button "addActionListener"
+      (interface "java.awt.event.ActionListener"  # When button is clicked,
+         'actionPerformed '((Ev) (bye)) ) )       # Exit PicoLisp
+   (java Frame "setSize" 100 60)
+   (java Frame "setVisible" T) )
+\end{wideverbatim}
+
+\subsection{Type conversion functions}
+\label{sec:ersatz-java-reflection-type-conversion-functions}
+
+Finally, we have a set of type conversion functions, to produce Java
+objects from Lisp data:
+
+\begin{wideverbatim}
+(byte: `num|sym) -> obj
+(char: `num|sym) -> obj
+(int: `num) -> obj
+(long: `num) -> obj
+(double: `str `cnt) -> obj
+(double: `num `cnt) -> obj
+(big: `num) -> obj
+\end{wideverbatim}
+
+For a more elaborated example, take a look at the article
+\hyperref[wiki-SwingRepl]{Swing REPL written in Ersatz PicoLisp}.
+

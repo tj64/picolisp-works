@@ -1,0 +1,236 @@
+\title{Working with tables in PicoLisp}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+\section{Example Data}
+\label{sec:work-with-tables-example-data}
+
+Let's examine a common example, a list of people forming a table without
+key access to each person could look like this:
+
+\begin{wideverbatim}
+(setq *People 
+      '(((name . John) (phone . 123456) (age . 56))
+        ((name . Fred) (phone . 654321) (age . 35))
+        ((name . Fred) (phone . 236597) (age . 38))
+        ((name . Hank) (phone . 078965) (age . 23))))
+\end{wideverbatim}
+
+
+\section{Retrieving data from the table}
+\label{sec:work-with-tables-retrieving-data-from-the-table}
+
+
+What you see is they way to specify pairs, each pair is a \texttt{car}
+and a \texttt{cdr}. If you recall the way \texttt{assoc} worked in the
+prior tutorial you realize that each sublist can be accessed with that
+function - since each key is a \texttt{car}. With that in mind a solution for
+retrieving a person by key and value could look like this:
+
+
+\begin{wideverbatim}
+(de assoc2d (Lst K V)
+    (filter '((Sub)
+              (let CurValue (cdr (assoc K Sub))
+                (= V CurValue))) Lst ) )
+                
+(println (assoc2d *People 'name 'Fred))
+\end{wideverbatim}
+
+The above example will retrieve a new list with all persons called Fred.
+The way this works is through \textbf{filter} which is a member of the same
+family as \textbf{mapcar}. Filter will return a new list with all items that
+the callback/literal function returned true for. As in the example in
+the prior tutorial Sub will be each element, in this case each person.
+
+Next we initiate a temporary variable with \texttt{(let CurValue (cdr
+  (assoc K Sub)} \emph{logic using CurValue here} ), \textbf{let} is a
+cousin of \texttt{setq} but will create it's own little space. Had we
+already had a variable called \texttt{CurValue} with some value in it in the
+above example - that variable would've gotten a new value inside the
+let expression. However after the let expression has finished
+executing, \texttt{CurValue} would revert back to it's original value. It's a
+convenient way of using a variable name temporarily without having to
+worry about wrecking something else.
+
+Next we use the equal (\texttt{=}) function to test if our current
+value is equal to the passed value in V, since \texttt{=} will return
+\texttt{T} (Pico Lisp's equivalent to true) if they are equal, or \texttt{NIL}
+(the equivalent of false) we are done. All sublists without the wanted
+key/value combination will return \texttt{NIL} and will therefore not get a
+place in the return array.
+
+What if you want to create your own table system, maybe you think the
+above way of defining a table is too verbose, you want it to look like
+this instead:
+
+\begin{wideverbatim}
+(setq *People 
+      '((name John phone 123456 age 56)
+        (name Fred phone 654321 age 35)
+        (name Fred phone 236597 age 38)
+        (name Hank phone 078965 age 23)))
+\end{wideverbatim}
+
+No problem, then you could define the lookup logic like this instead:
+
+\begin{wideverbatim}
+(de assoc1d (Lst Key) 
+    (loop
+     (NIL Lst NIL)
+     (T (= Key (pop 'Lst)) (pop 'Lst))
+     (pop 'Lst)))
+
+(de assoc2d (Lst K V)
+    (filter '((Sub)
+              (= V (assoc1d Sub K))) Lst ) )
+
+(println (assoc2d *People 'name 'Fred))
+\end{wideverbatim}
+
+Our custom \texttt{assoc1d} function is basically a replacement of
+\texttt{assoc} tailored to our custom table system. It will return the
+value of the passed key or \texttt{NIL} if the key can't be found. You
+could try it out in isolation:
+
+\begin{wideverbatim}
+(println (assoc1d '(phone 123456 name John age 56) 'name))
+\end{wideverbatim}
+
+The \textbf{loop} function will let us loop infinitely and have an
+arbitrary amount of conditional exits at the same time. We begin by
+checking if the list (\texttt{Lst}) is \texttt{NIL} (all elements have
+been popped off), if that is the case we return \texttt{NIL}. If not then we
+pop an element off and check if it matches the passed key, if yes then
+we return the next element (the value) by popping it off. If the key
+didn't match we will continue down the loop conditionals and simply
+pop the value off without returning it. The equivalent would look
+something like this in PHP:
+
+\begin{wideverbatim}
+function assoc1d($lst, $key){
+  while(!empty($lst)){
+    if($key == array_shift($lst))
+      return array_shift($lst);
+    else
+      array_shift($lst);
+  }
+  return false;
+}
+\end{wideverbatim}
+
+In this case the Lisp equivalent isn't really any shorter. However, the
+alternative to loop would be the use of temporary variables and so on
+and that is a road we don't want to start walking down.
+
+The \texttt{assoc2d} function doesn't present us with any surprises, we simply
+check each returned value from the \texttt{assoc1d} function with the passed
+value (V).
+
+
+\section{Sort the table}
+\label{sec:work-with-tables-sort-the-table}
+
+So what if we want to sort our table of persons? The solution is similar
+to sorting
+\href{http://www.prodevtips.com/2008/01/06/sorting-2d-arrays-in-php-anectodes-and-reflections/}{tables in PHP}. We will extract the values (column) we want to sort by - with
+the help of the key:
+
+\begin{wideverbatim}
+(de getCol (Lst K)
+    (mapcar '((Sub)(assoc1d Sub K)) Lst ) )
+    
+(println (getCol *People 'phone))
+\end{wideverbatim}
+
+Let's put it all together:
+
+
+\begin{wideverbatim}
+(de getSorting (Sorted Original)
+    (make
+     (while Original
+            (let Value (pop 'Original)
+              (setq Sorted 
+                    (place 
+                     (link (index Value Sorted)) Sorted NIL ))))))
+
+(de sort2d (L Key)  
+     (let Col (getCol L Key)
+       (mapcar '((Pos)(get L Pos)) (getSorting (sort (copy Col)) Col) )))
+
+(println (sort2d *People 'name))
+\end{wideverbatim}
+
+When contemplating problems in Lisp it helps to think in terms of how
+to generate intermediate lists that are needed to solve the problem.
+In this case we generate a list describing how to sort our table
+through the \texttt{getSorting} function. That list will be used in
+the \texttt{Sort2d} function to do the actual sorting.
+
+In \texttt{Sort2d} we begin by fetching the column represented by the
+key, in this case we get a flat list of names as they appear in the
+table (a column). Note that we use \textbf{copy} before we sort the
+first argument to \texttt{getSorting}, the reason being that sort will
+also sort in place, therefore to get two distinct columns in
+\texttt{getSorting} we have to copy one of them, in this case the
+sorted version. Otherwise they would both be sorted and that would
+ruin everything.
+
+Right at the beginning of \texttt{getSorting} we start with
+\textbf{make} which will initiate a make environment. Inside a make
+environment there are a few special functions that can be used, the
+most common one is \textbf{link} which we use here. In this case make
+will return a list created with all arguments to link. It doesn't
+matter how or where the link is called, whenever and wherever it is
+called within the make environment will cause it to append another
+item to the list being made.
+
+Here we will loop through the Original column with unsorted names and
+pop a name off each time until it's empty. Each name is stored in
+Value followed by a call to \texttt{setq} to change the Sorted column
+but why? The reason is duplicate names, we need some way of marking
+already fetched names by setting them to \texttt{NIL}, otherwise the
+\textbf{index} function would return the same position for Fred. This
+would later result in us getting a copy of the first Fred in the
+sorted table instead of two unique Freds, that is really, really
+unwanted behavior.
+
+This way of preventing duplicate Freds feels a little bit ugly. In Lisp
+there is not one way of doing something, in fact there are probably an
+infinite number of ways of doing something, one better than the other,
+only the imagination and cleverness of the programmer sets the limits.
+And unfortunately my limit was reached here, but somehow I realize that
+there probably is a better way \dots{}
+
+Anyway, it's the \textbf{place} function that is responsible for replacing
+names whose positions we have already linked with \texttt{NIL}, the above way of
+doing this is possible because link returns the value it links as well
+as linking it, thus it can be used with place at the same time. Check
+out both index, place, make and link in the reference.
+
+The main point with \texttt{getSorting} is that we compare the sorted
+names with the unsorted names and return the position of the original
+name in the sorted column. These are then used in \texttt{‘((Pos)(get
+  L Pos))} as each \texttt{Pos} with \textbf{get}. \texttt{Get} can be
+used in a variety of situations, in this case it's simply used as an
+index lookup, in PHP it might have looked like \$L[\$Pos].
+
+Don't like the way the table got sorted? No problem, try calling
+\texttt{Sort2d} like this instead:
+
+
+\begin{wideverbatim}
+(println (flip (sort2d *People 'name)))
+\end{wideverbatim}
+
+Yep, \textbf{flip} will reverse the list.
+
+Maybe a bit late but: This is probably not the way you would be working
+with records in a ``sharp'' situation. Every person would then be a
+database object and sorted upon retrieval, don't get mad though. The
+above was a good exercise in any case.
+
+Note also the use of \textbf{name}, as you can see it seems like it's a
+reserved word, still we are able to use it by quoting it.
+

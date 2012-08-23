@@ -1,0 +1,212 @@
+\title{Pilog Solve and the +Aux Relation}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+
+\begin{abstract}
+  This article uses the 'Doctrine' example (known from the PHP world)
+  to demonstrate the usage (and advantages) of Pilog \texttt{solve} and
+  the \texttt{+Aux} relation. 
+\end{abstract}
+
+\section{'Doctrine for dummies' example}
+\label{sec:pilog-solve-'doctrine-for-dummies'-example}
+
+
+I just set out to duplicate the
+\href{http://www.prodevtips.com/2008/08/05/doctrine-for-dummies/}{Doctrine
+  for dummies example}, but this time for real, with a real OODB
+system, not some silly ORM. Thanks goes to Alex for helping me out with
+the queries.
+
+
+\begin{wideverbatim}
+(class +Member +Entity)
+(rel uname  (+Need +Key +String))
+(rel pwd    (+Need +String))
+(rel email  (+String))
+(rel city   (+Ref +Link) NIL (+City))
+
+(class +City +Entity)
+(rel name   (+Key +String))
+
+(class +Message +Entity)
+(rel subject (+Idx +String))
+(rel body    (+String))
+(rel from    (+Ref +Link) NIL (+Member))
+(rel to      (+Aux +Ref +Link) (from) NIL (+Member))
+
+(pool "dbtest.db")
+\end{wideverbatim}
+
+So we create the relations, and the database file. Take special note of
+the \textbf{+Aux} relation from \textbf{to} to \textbf{from}. It will play a central role
+later.
+
+
+\begin{wideverbatim}
+(setq Mbrs 
+  (list
+     (list "member1" "password1" "member1@members.com" "Berlin")
+     (list "member2" "password2" "member2@members.com" "Stuttgart")
+     (list "member3" "password3" "member3@members.com" "Hamburg")))
+  
+(for Mbr Mbrs
+  (request '(+Member) 
+     'uname (get Mbr 1) 
+     'pwd   (get Mbr 2) 
+     'email (get Mbr 3) 
+     'city  (request '(+City) 'name (get Mbr 4))))
+\end{wideverbatim}
+
+We input some members in the database, note the use of \textbf{request}. The
+major thing is that it will create an object if there is none with the
+given key(s) already, however if there is an object with the given keys
+it will return that object, quite handy.
+
+
+\begin{wideverbatim}
+(setq Mbr1 (db 'uname '+Member "member1"))
+(setq Mbr2 (db 'uname '+Member "member2"))
+
+(new T '(+Message) 
+  'subject "from mbr1 to mbr2"
+  'body "Hello mbr2 this is mbr1"
+  'to Mbr2
+  'from Mbr1)
+  
+(new T '(+Message) 
+  'subject "from mbr2 to mbr1"
+  'body "Hello mbr1 this is mbr2"
+  'to Mbr1
+  'from Mbr2)
+  
+(new T '(+Message) 
+  'subject "from mbr2 to mbr1, again"
+  'body "Hello mbr1 this is mbr2, again"
+  'to Mbr1
+  'from Mbr2)
+  
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+(new T '(+Message) 
+  'subject "from mbr1 to mbr3"
+  'body "Hello mbr3 this is mbr1"
+  'to (db 'uname '+Member "member3")
+  'from Mbr1)
+  
+(commit)
+\end{wideverbatim}
+
+Note the use of \textbf{(new T\dots{})} without the \texttt{T} we won't
+get database objects.
+
+
+\section{Querying}
+\label{sec:pilog-solve-querying}
+
+\subsection{Simple queries}
+\label{sec:pilog-solve-simple-queries}
+
+\begin{wideverbatim}
+(mapc show (collect 'to '+Message Mbr1 Mbr1 'from))
+(mapc show (collect 'from '+Message Mbr1 Mbr1 'to))
+(mapc show (collect 'from '+Message Mbr1 Mbr1))
+(mapc show (collect 'to '+Message Mbr1 Mbr1))
+\end{wideverbatim}
+
+Test that everything is there by calling the above statements, the first
+one will get all people who sent a message to member 1. The second one
+will instead get all people who member 1 sent messages to. The two last
+ones will do the same but will get messages, not people. And that was
+that, this is as complex as the PHP Doctrine example got, let's move on
+to more complex stuff relating to the +Aux relation:
+
+\subsection{Using the \texttt{+Aux} relation}
+\label{sec:pilog-solve-using-the-+aux}
+
+\begin{wideverbatim}
+(scan (tree 'to '+Message))
+(scan (tree 'from '+Message))
+\end{wideverbatim}
+
+Output:
+
+\begin{wideverbatim}
+({5} {:} . {H}) {H}
+({5} {:} . {I}) {I}
+({:} {5} . {B}) {B}
+({A} {5} . {L}) {L}
+
+({5} . {B}) {B}
+({5} . {L}) {L}
+({:} . {H}) {H}
+({:} . {I}) {I}
+-> {F}
+\end{wideverbatim}
+
+Notice the difference, the \textbf{to} relation is utilizing \textbf{+Aux} so we have
+extra references there between the message receiver and sender. Together
+the combination can be used as a key to speed up things.
+
+
+\begin{wideverbatim}
+(mapc show (collect 'to '+Message (list Mbr1 Mbr2)))
+\end{wideverbatim}
+
+This is an example of how to use the \texttt{+Aux} relation to get all messages
+to member 1 from member 2 with \textbf{collect}.
+
+
+\subsection{Pilog \texttt{solve} with parallel scanning}
+\label{sec:pilog-solve-using-the-+aux}
+
+\begin{wideverbatim}
+(mapc show
+   (solve  
+     (quote @M1 Mbr1 @M2 Mbr2 @S "mbr2" 
+        (select (@Msgs) 
+           ((subject +Message @S) (to +Message @M1) (from +Message @M2))
+           (same @M1 @Msgs to)
+           (same @M2 @Msgs from)
+           (tolr @S @Msgs subject)))  
+     @Msgs ))
+\end{wideverbatim}
+
+The above code will retrieve all messages from member 2 to member 1
+that also contain the word “\texttt{mbr2}″ in the subject. It is
+however not using the \texttt{+Aux} relation to make the lookup of who
+is sending a message to who, we scan in parallel here.
+
+
+\subsection{Pilog \texttt{solve} using the \texttt{+Aux} relation}
+\label{sec:pilog-solve-using-the-+aux}
+
+
+\begin{wideverbatim}
+(mapc show 
+   (solve
+      (quote
+         @M1 Mbr1
+         @M2 Mbr2
+         @M (list Mbr1 Mbr2)
+         @S "mbr2"
+         (select (@Msgs)
+            ((subject +Message @S) (to +Message @M))
+            (tolr @S @Msgs subject)
+            (same @M1 @Msgs to)
+            (same @M2 @Msgs from))) 
+      @Msgs ))
+\end{wideverbatim}
+
+This example is however using the \texttt{+Aux} relation. The
+\textbf{@M} list will look for for example the \textbf{\{5\} \{:\}}
+combo above in the \textbf{(to +Message @M)} clause. Next we filter as
+usual.
+
+After benchmarking the above examples I got a 3\% speed increase in favor
+of the second one using 6000 messages to test on, when using 11000 the
+difference increased to 11\% so careful planning will pay off more and
+more the bigger the database becomes.

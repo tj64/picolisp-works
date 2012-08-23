@@ -1,0 +1,152 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%% author.tex %%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% sample root file for your contribution to a "contributed book"
+%
+% "contributed book"
+%
+% Use this file as a template for your own input.
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% RECOMMENDED %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass{svmult}
+
+% choose options for [] as required from the list
+% in the Reference Guide, Sect. 2.2
+
+\usepackage{makeidx}         % allows index generation
+\usepackage{graphicx}        % standard LaTeX graphics tool
+                             % when including figure files
+\usepackage{multicol}        % used for the two-column index
+\usepackage[bottom]{footmisc}% places footnotes at page bottom
+% etc.
+% see the list of further useful packages
+% in the Reference Guide, Sects. 2.3, 3.1-3.3
+
+\makeindex             % used for the subject index
+                       % please use the style sprmidx.sty with
+                       % your makeindex program
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\title*{Contribution Title}
+% Use \titlerunning{Short Title} for an abbreviated version of
+% your contribution title if the original one is too long
+\author{Name of Author\inst{1}\and
+Name of Author\inst{2}}
+% Use \authorrunning{Short Title} for an abbreviated version of
+% your contribution title if the original one is too long
+\institute{Name and Address of your Institute
+\texttt{name@email.address}
+\and Name and Address of your Institute \texttt{name@email.address}}
+%
+% Use the package "url.sty" to avoid
+% problems with special characters
+% used in your e-mail or web address
+%
+\maketitle
+
+Your text goes here. Separate text sections with the standard \LaTeX\
+sectioning commands.
+
+\section{Section Heading}
+\label{sec:1}
+% Always give a unique label
+% and use \ref{<label>} for cross-references
+% and \cite{<label>} for bibliographic references
+% use \sectionmark{}
+% to alter or adjust the section heading in the running head
+Your text goes here. Use the \LaTeX\ automatism for your citations
+\cite{monograph}.
+
+\subsection{Subsection Heading}
+\label{sec:2}
+Your text goes here.
+
+\begin{equation}
+\vec{a}\times\vec{b}=\vec{c}
+\end{equation}
+
+\subsubsection{Subsubsection Heading}
+Your text goes here. Use the \LaTeX\ automatism for cross-references as
+well as for your citations, see Sect.~\ref{sec:1}.
+
+\paragraph{Paragraph Heading} %
+Your text goes here.
+
+\subparagraph{Subparagraph Heading.} Your text goes here.%
+%
+\index{paragraph}
+% Use the \index{} command to code your index words
+%
+% For tables use
+%
+\begin{table}
+\centering
+\caption{Please write your table caption here}
+\label{tab:1}       % Give a unique label
+%
+% For LaTeX tables use
+%
+\begin{tabular}{lll}
+\hline\noalign{\smallskip}
+first & second & third  \\
+\noalign{\smallskip}\hline\noalign{\smallskip}
+number & number & number \\
+number & number & number \\
+\noalign{\smallskip}\hline
+\end{tabular}
+\end{table}
+%
+%
+% For figures use
+%
+\begin{figure}
+\centering
+% Use the relevant command for your figure-insertion program
+% to insert the figure file.
+% For example, with the option graphics use
+\includegraphics[height=4cm]{figure.eps}
+%
+% If not, use
+%\picplace{5cm}{2cm} % Give the correct figure height and width in cm
+%
+\caption{Please write your figure caption here}
+\label{fig:1}       % Give a unique label
+\end{figure}
+%
+% For built-in environments use
+%
+\begin{theorem}
+Theorem text\footnote{Footnote} goes here.
+\end{theorem}
+%
+% or
+%
+\begin{lemma}
+Lemma text goes here.
+\end{lemma}
+%
+%
+% BibTeX users please use
+% \bibliographystyle{}
+% \bibliography{}
+%
+% Non-BibTeX users please follow the syntax
+% the syntax of "referenc.tex" for your own citations
+\input{referenc}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\printindex
+\end{document}
+
+
+
+
+

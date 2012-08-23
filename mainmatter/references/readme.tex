@@ -1,0 +1,138 @@
+\title{README}
+\input{mainmatter/authors/alex}
+\maketitle
+
+% \section{README}
+% \label{sec:readme-readme}
+
+
+\begin{abstract}
+  This is the README file of the PicoLisp distribution. 
+\end{abstract}
+
+\section{The PicoLisp System}
+\label{sec:readme-the-picolisp-system}
+
+
+\begin{wideverbatim}
+  _PI_co Lisp is not _CO_mmon Lisp
+\end{wideverbatim}
+
+PicoLisp can be viewed from two different aspects: As a general purpose
+programming language, and a dedicated application server framework.
+
+
+\subsection{Programming Language}
+\label{sec:readme-programming-language}
+
+As a programming language, PicoLisp provides a 1-to-1 mapping of a
+clean and powerful Lisp derivate, to a simple and efficient virtual
+machine. It supports persistent objects as a first class data type,
+resulting in a database system of Entity/Relation classes and a
+Prolog-like query language tightly integrated into the system.
+
+The virtual machine was designed to be
+\begin{description}
+\item[Simple] The internal data structure should be as simple as
+  possible. Only one single data structure is used to build all higher
+  level constructs.
+\item[Unlimited] There are no limits imposed upon the language due to
+  limitations of the virtual machine architecture. That is, there is
+  no upper bound in symbol name length, number digit counts, or data
+  structure and buffer sizes, except for the total memory size of the
+  host machine.
+\item[Dynamic] Behavior should be as dynamic as possible ("run"-time
+  vs. "compile"-time). All decisions are delayed till runtime where
+  possible. This involves matters like memory management, dynamic
+  symbol binding, and late method binding.
+\item[Practical] PicoLisp is not just a toy of theoretical value.
+  PicoLisp is used since 1988 in actual application development,
+  research and production.
+\end{description}
+   
+The language inherits the major advantages of classical Lisp systems like
+\begin{itemize}
+\item Dynamic data types and structures
+\item Formal equivalence of code and data
+\item Functional programming style
+\item An interactive environment
+\end{itemize}
+
+PicoLisp is very different from any other Lisp dialect. This is partly
+due to the above design principles, and partly due to its long
+development history since 1984.
+
+You can download the latest release version at
+http://software-lab.de/down.html
+
+\subsection{Application Server Framework}
+\label{sec:readme-application-server-framework}
+
+As an application server framework, PicoLisp provides for
+
+\paragraph{NoSQL Database Management}
+\label{par:readme-nosql-database-management}
+
+  \begin{itemize}
+    \item Index trees
+    \item Object local indexes
+    \item Entity/Relation classes
+    \item Pilog (PicoLisp Prolog) queries
+    \item Multi-user synchronization
+    \item DB Garbage collection
+    \item Journaling, Replication
+  \end{itemize}
+
+\paragraph{User Interface}
+\label{par:readme-user-interface}
+
+  \begin{itemize}
+    \item Browser GUI
+     \item X)HTML/CSS
+     \item XMLHttpRequest/JavaScript
+  \end{itemize}
+
+\paragraph{Application Server} 
+\label{par:readme-application-server}
+
+  \begin{itemize}
+    \item Process management
+    \item Process family communication
+    \item XML I/O
+    \item Import/export
+    \item User administration
+    \item Internationalization
+    \item Security
+    \item Object linkage
+    \item Postscript/Printing
+  \end{itemize}
+
+
+PicoLisp is not an IDE. All program development in Software Lab. is
+done using the console, bash, vim and the Lisp interpreter.
+
+The only type of GUI supported for applications is through a browser
+via HTML. This makes the client side completely platform independent.
+The GUI is created dynamically. Though it uses JavaScript and
+XMLHttpRequest for speed improvements, it is fully functional also
+without JavaScript or CSS.
+
+The GUI is deeply integrated with - and generated dynamically from -
+the application's data model. Because the application logic runs on
+the server, multiple users can view and modify the same database
+object without conflicts, everyone seeing changes done by other users
+on her screen immediately due to the internal process and database
+synchronization.
+
+PicoLisp is free software, and you are welcome to use and redistribute
+it under the conditions of the MIT/X11 License (see "COPYING").
+
+It compiles and runs on current 32-bit GNU/Linux, FreeBSD, Mac OS X
+(Darwin), Cygwin/Win32 (and possibly other) systems. A native 64-bit
+version is available for x86-64/Linux, x86-64/SunOS and ppc64/Linux.
+
+
+% Local variables:
+% mode: latex
+% TeX-master: "../../editor.tex"
+% End:

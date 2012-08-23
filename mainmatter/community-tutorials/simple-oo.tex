@@ -1,0 +1,165 @@
+\title{Simple OO in PicoLisp}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+\section{Defining classes}
+\label{sec:simple-oo-defining-classes}
+
+PicoLisp has a very nice object system which will take some time to
+explore, let's begin with simple examples and work towards more complex
+scenarios.
+
+
+\begin{wideverbatim}
+(class +Person)
+
+(dm hello> ()
+    (prin "hello"))
+ 
+(hello> '+Person)
+\end{wideverbatim}
+
+In this example we do not instantiate an object, in PHP the last call
+would correspond to \texttt{Person::hello()}.
+
+
+\begin{wideverbatim}
+(class +Person)
+
+(dm setHello> (HelloPhrase)
+    (=: hello HelloPhrase))
+
+(dm hello> ()
+    (prin (: hello)))
+    
+(setHello> '+Person "Hello how are you?")
+
+(hello> '+Person)
+\end{wideverbatim}
+
+There are two shortcuts at work here, \textbf{=:} will \textbf{put} the contents of
+HelloPhrase into the member variable hello, \textbf{:} will in turn \textbf{get} it.
+
+
+\section{Creating instances}
+\label{sec:simple-oo-creating-instances}
+
+Let's start creating instances:
+
+\begin{wideverbatim}
+(class +Person)
+
+(dm T (Age Name)
+    (=: age Age)
+    (=: name Name))
+
+(setq *John (new '(+Person) 65 'John))
+
+(show *John)
+\end{wideverbatim}
+
+So the first argument to \textbf{new} is a quoted list with the class
+we want to use. The constructor is the \texttt{T} method, that is a
+requirement, it always has to be called \texttt{T} for PicoLisp to
+notice it correctly.
+
+Add the above hello functions to the John code above and try:
+
+\begin{wideverbatim}
+(setHello> *John "Hello how are you?")
+
+(hello> *John)
+\end{wideverbatim}
+
+As you can see the result is the same, in this regard PicoLisp is similar to
+PHP:
+
+\begin{wideverbatim}
+class Person{
+
+  static $hello;
+  
+  function __construct($age, $name){
+    $this->age = $age;
+    $this->name = $name;
+  }
+  
+  static function setHello($HelloPhrase){
+    self::$hello = $HelloPhrase;
+  }
+  
+  static function hello(){
+    echo self::$hello;
+  }
+}
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+
+$john = new Person(65, "John");
+
+$john->setHello("Hello how are you?");
+
+$john->hello();
+
+Person::hello();
+\end{wideverbatim}
+
+The only difference is that PHP requires us to declare the
+\texttt{\$hello} variable in order for it to be used in subsequent
+functions. A requirement which makes static usage less useful in PHP
+than in PicoLisp.
+
+\section{Fetch from and sort a list of objects}
+\label{sec:simple-oo-fetch-from-and-sort-a-list-of-objects}
+
+
+Let's see how we can fetch from and sort a list of persons:
+
+\begin{wideverbatim}
+(setq *Persons (list 
+               (new '(+Person) 65 'John) 
+               (new '(+Person) 38 'Fred)
+               (new '(+Person) 41 'Annie) 
+               (new '(+Person) 42 'Sam)))
+\end{wideverbatim}
+
+This is actually how it could look after you get a list of people from a
+database which makes this example more useful than the stuff we did in
+the prior tutorial in this series.
+
+
+\begin{wideverbatim}
+(de assoc2d (Lst Key Value)
+    (filter '((Sub)(= (get Sub Key) Value)) Lst))
+
+(show (car (assoc2d *Persons 'name 'John)))
+\end{wideverbatim}
+
+As you can see \textbf{get} can be used to get member variables in objects as
+well as by index as in the prior tutorial.
+
+Sorting is similar to what we have already done in the prior part, in
+fact \texttt{getSorting} doesn't have to be changed at all, neither
+does \texttt{sort2d}:
+
+
+\begin{wideverbatim}
+(de getCol (Lst K) 
+    (mapcar '((Sub)(get Sub K)) Lst ) ) 
+
+(de getSorting...
+
+(de sort2d...
+
+(show (car (sort2d *Persons 'name)))
+\end{wideverbatim}
+
+Try removing the car in the last call, you will get a list looking
+something like \texttt{(\$34567855 \$68904356 \$21345679 \$56854378)}.
+Show will only print their addresses when accessing objects indirectly
+as is the case here when they are in a list. I leave it as an exercise
+to write a function that loops through the list and shows each person.
+

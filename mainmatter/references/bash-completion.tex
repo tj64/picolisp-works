@@ -1,0 +1,98 @@
+\title{Bash Completion}
+\input{mainmatter/authors/alex}
+\maketitle
+
+% % 18jul12
+% % Alexander Burger
+
+% \documentclass[10pt,a4paper]{article}
+% \usepackage{graphicx}
+
+% \textwidth 1.4\textwidth
+% \textheight 1.125\textheight
+% \oddsidemargin 0em
+% \evensidemargin 0em
+% \headsep 0em
+% \parindent 0em
+% \parskip 6pt
+
+% \title{Bash Completion}
+% \author{Alexander Burger\\abu@software-lab.de}
+% \date{2012-01-05}
+
+% \begin{document}
+% \maketitle
+
+\begin{abstract}
+This article describes how Bash completion works in PicoLisp.   
+\end{abstract}
+
+\section{Bash Completion}
+\label{sec:bash-bash-completion}
+
+Since picoLisp-3.0.9 there is support for Bash completion.
+
+While it is not precisely the absolute killer-feature, bash completion is quite
+handy when developing PicoLisp applications from the shell command line.
+
+If you installed PicoLisp locally (i.e. not from a distribution package), you
+need to copy two files
+\begin{wideverbatim}
+   $ cp lib/complete.l /usr/lib/picolisp/lib/
+   $ cp lib/bash_completion /etc/bash_completion.d/pil
+\end{wideverbatim}
+
+As ever, source \texttt{. /etc/bash\_completion} in your .bashrc
+
+
+Per default, if you hit the TAB key during command line input, Bash completes
+things it knows about, like commands and path names.
+
+PicoLisp -- in addition to normal path/file name arguments -- accepts two
+particular types of arguments:
+\begin{enumerate}
+   \item If the argument's first character is '-', then the rest of that argument is
+   taken as a Lisp function call (without the surrounding parentheses).
+   \item If the argument's first character is '@', then it is interpreted as a path
+   into the interpreter's installation directory.
+\end{enumerate}
+
+For (1), the expansion actually searches all built-in function names of the
+given invocation. For example, entering
+\begin{wideverbatim}
+   $ pil -ver
+\end{wideverbatim}
+
+and then hitting TAB will expand to ``-version``.
+
+The expansion also honors single or double quotes, to allow for function
+arguments:
+\begin{wideverbatim}
+   $ pil -'pri
+\end{wideverbatim}
+
+or
+\begin{wideverbatim}
+   $ pil -"pri
+\end{wideverbatim}
+
+This expands to the printing functions.
+
+For (2), the intended path name is properly expanded. This works regardless of
+whether it is a global or a local installation, as it always searches the
+invoked interpreter's environment.
+\begin{wideverbatim}
+   $ pil @lib/xh
+\end{wideverbatim}
+
+and
+\begin{wideverbatim}
+   $ <somePath>/pil @lib/xh
+\end{wideverbatim}
+
+both will expand to ``@lib/xhtml.l``.
+
+As an extra goody, an empty argument expands to '+' (the trailing debug flag --
+perhaps the most often needed command line argument).
+
+

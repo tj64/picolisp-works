@@ -1,0 +1,122 @@
+\title{Simple OODB in PicoLisp}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+\section{Walk through a simple  example}
+\label{sec:simple-oodb-walk-through-a-simple-example}
+
+Let's walk through a simple and usual example, what would constitute a
+user table in MySQL:
+
+\begin{wideverbatim}
+(class +User +Entity)
+(rel username (+Need +Key +String))
+(rel password (+Need +String))
+
+(pool "users.db")
+
+(new! '(+User) 'username "sam" 'password "parrotno5")
+(new! '(+User) 'username "fred" 'password "MegaPizza")
+(new! '(+User) 'username "anna" 'password "swooosh")
+(new! '(+User) 'username "fred" 'password "yiiihaaa")
+(new! '(+User) 'username NIL 'password "asdf")
+
+(mapcar show (collect 'username '+User))
+\end{wideverbatim}
+
+Output:
+
+\begin{wideverbatim}
+{6} (+User)
+   password "swooosh"
+   username "anna"
+{5} (+User)
+   password "MegaPizza"
+   username "fred"
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+{2} (+User)
+   password "parrotno5"
+   username "sam"
+-> ({6} {5} {2})
+
+\end{wideverbatim}
+
+That was quite a lot at the same time. All classes that are to
+generate objects stored in the database needs to be children of
+\texttt{+Entity}. Furthermore some relations are needed in the form of
+prefix classes, \textbf{rel} will in this case take the name of the
+relation, username, and the list of classes that will define the
+behavior of the relation. Prefix classes has been explained in the
+prior tutorial.
+
+In the case of the username we have \texttt{+Need} which denotes that
+this relation is needed for successful creation of the persistent
+object. As you can see in the output the last call to \textbf{new!}
+(only difference from \textbf{new} is that we create the object in a
+file instead of in the RAM) never resulted in an object on disc since
+no key was created. In our case the username will be used as key and
+needs to be unique, hence no second ``fred'' in the output. Of course
+both username and password will both be strings. There is a short
+description of more relations in the
+\href{http://www.software-lab.de/ref.html#dbase}{reference}.
+
+\section{External symbols}
+\label{sec:simple-oodb-external-symbols}
+
+Instead of the above run this (don't delete \texttt{users.db}!):
+
+\begin{wideverbatim}
+(class +User +Entity)
+(rel username (+Need +Key +String))
+(rel password (+Need +String))
+
+(pool "users.db")
+
+(show '{2})
+\end{wideverbatim}
+
+
+This will give us ``sam'' which means that he is directly accessible
+through \texttt{\{2\}} which
+\href{http://www.software-lab.de/ref.html#external-io}{Alex} explains
+better than me:
+
+\begin{quote}
+  External symbol names are surrounded by braces (`\texttt{\{'} and
+  \texttt{`\}}'). The characters of the symbol's name itself identify
+  the physical location of the external object. This is currently the
+  number of the starting block in the database file, encoded in
+  base--64 notation (characters `\texttt{0}′ through ‘\texttt{9}′,
+  ‘\texttt{:}' through ‘\texttt{;}', `\texttt{A}' through `\texttt{Z}'
+  and `\texttt{a}' through `\texttt{z}').
+\end{quote}
+
+Instead of \texttt{(show ‘\{2\})} try:
+
+
+\begin{wideverbatim}
+(show (db 'username '+User "sam"))
+\end{wideverbatim}
+
+This is basically the equivalent of:
+
+\begin{wideverbatim}
+SELECT * FROM `user` WHERE BINARY username = 'sam'
+\end{wideverbatim}
+
+And
+
+\begin{wideverbatim}
+(show (db 'username '+User "fred" 'password "MegaPizza"))
+\end{wideverbatim}
+
+is of course the same as the login SQL:
+
+\begin{wideverbatim}
+SELECT * FROM `user` WHERE BINARY username = 'fred' 
+AND BINARY password = 'MegaPizza'
+\end{wideverbatim}

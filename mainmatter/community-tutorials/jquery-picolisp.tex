@@ -1,0 +1,102 @@
+\title{jQuery and PicoLisp}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+\begin{abstract}
+  This article describes problems arising when trying to make
+  \texttt{jQuery} and \texttt{PicoLisp} work together, as well as
+  possible solutions and their implementation. 
+\end{abstract}
+
+\section{Problem}
+\label{sec:jquery-picolisp}
+
+The heart of the problem with making \texttt{jQuery.post} work with
+the PicoLisp server is simple once found (thanks to Alex for helping
+me find it). Apache seems to use the Content-Length header to
+determine the length of the argument sent by
+\texttt{XMLHttpRequest.send()}, the PicoLisp server doesn't bother with
+determining the the length. It looks for a \texttt{newline} at the end instead.
+
+\section{Solution}
+\label{sec:dsf}
+
+\subsection{Description}
+\label{sec:ds}
+
+How do we solve this problem considering that \texttt{\$.ajax} does
+not append a newline? With my abysmal knowledge of OO programming in
+Javascript (all that prototyping makes my head hurt) I've opted for
+the simplest and dirtiest solution. A simple copy paste of
+\texttt{\$.post} and \texttt{\$.ajax} implemented as a separate plugin
+to enable effortless upgrades of the core, the new stuff can be called
+with \texttt{\$.pico.post} and works just like the original.
+
+The only change in the plugin compared with the original is line 2806
+in \texttt{jquery.js}, it looks like this in the original:
+\textbf{xhr.send(s.data);}, I've changed that to
+\textbf{xhr.send(s.data + `\r\n');}.
+
+\subsection{Implementation}
+\label{sec:dfs}
+
+My current application renders the HTML like this:
+
+\begin{wideverbatim}
+(de js (JS)
+   (prinl "<script type=\"text/javascript\" src=\""
+      (pack *BP "js/" JS) "\"></script>" ) )
+
+(de rss-html Prg
+   (html 0 "RSS Reader" *Css NIL
+      (js "jquery.js")
+      (js "jquery.pico.js")
+      (js "rss-reader.js")
+      (<div> 'page_margins
+         (<div> 'page 
+            (<div> 'header "header")
+            (<div> 'main
+               (<div> 'left 
+                  (<div> 'left_content (leftContent)))
+               (<div> 'middle 
+                  (<div> 'middle_content (run Prg 1)))
+               (<div> 'right 
+                  (<div> 'right_content "right"))
+               (<div> 'clear)))
+         (<div> 'footer "footer"))))
+\end{wideverbatim}
+
+So we include the new plugin in the form of \textbf{(js ``jquery.pico.js'')},
+after the base library.
+
+The rss-reader.js file now contains this:
+
+
+\begin{wideverbatim}
+$(document).ready(function(){
+  $(".articles_link").css('cursor', 'pointer').click(function(){
+    $.pico.post("@ajaxTest", {jquerytest: "test"}, function(res){
+      $(".middle_content").html(res);
+    });
+  });
+});
+\end{wideverbatim}
+
+When one of the links are clicked we call \textbf{@ajaxTest:}
+
+
+\begin{wideverbatim}
+(de ajaxTest ()
+  (httpHead "text/plain; charset=utf-8")
+  (ht:Out T
+     (ht:Prin (pack "Result: " (get 'jquerytest 'http)))))
+\end{wideverbatim}
+
+And the contents of the div with the class attribute of
+``middle\_content'' changes to \textbf{Result: test}, great.
+
+Source:
+\href{http://www.prodevtips.com/wp-content/uploads/2008/10/jquerypico.js}{jquerypico.js}
+
+Note that we make use of the httpGate here, the base url in this example
+is \href{http://localhost}{http://localhost}, not \href{http://localhost:8080}{http://localhost:8080}.

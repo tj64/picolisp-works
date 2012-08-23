@@ -1,0 +1,204 @@
+\title{INSTALL}
+\input{mainmatter/authors/alex}
+\maketitle
+
+% \section{INSTALL}
+% \label{sec:install-install}
+
+
+\begin{abstract}
+This is the INSTALL file from the PicoLisp distribution.   
+\end{abstract}
+
+
+\section{PicoLisp Installation}
+\label{sec:install-picolisp-installation}
+
+There is no 'configure' procedure, but the PicoLisp file structure is
+simple enough to get along without it (we hope). It should compile and
+run on GNU/Linux, FreeBSD, Mac OS X (Darwin), Cygwin/Win32, and
+possibly other systems without problems.
+
+PicoLisp supports two installation strategies: Local and Global.
+
+The default (if you just download, unpack and compile the release) is a local
+installation. It will not interfere in any way with the world outside its
+directory. There is no need to touch any system locations, and you don't have to
+be root to install it. Many different versions - or local modifications - of
+PicoLisp can co-exist on a single machine.
+
+For a global installation, allowing system-wide access to the executable and
+library/documentation files, you can either install it from a ready-made
+distribution, or set some symbolic links to one of the local installation
+directories as described below.
+
+Note that you are still free to have local installations along with a global
+installation, and invoke them explicitly as desired.
+
+
+\section{Local Installation}
+\label{sec:install-local-installation}
+
+\subsection{Unpack the distribution}
+\label{sec:install-unpack-the-distribution}
+
+\begin{wideverbatim}
+  $ tar xfz picoLisp-XXX.tgz
+\end{wideverbatim}
+
+\subsection{Change the directory}
+\label{sec:install-change-the-directory}
+
+\begin{wideverbatim}
+  $ cd picoLisp-XXX
+\end{wideverbatim}
+
+\subsection{Compile the PicoLisp interpreter}
+\label{sec:install-compile-the-picolisp-interpreter}
+
+\begin{wideverbatim}
+  $ (cd src; make)
+\end{wideverbatim}
+
+Or - if you have an x86-64 system (under Linux or SunOS), or a ppc64
+system (under Linux) - build the 64-bit version
+
+\begin{wideverbatim}
+  $ (cd src64; make)
+\end{wideverbatim}
+
+In both cases the executable bin/picolisp will be created.
+
+To build the 64-bit version the first time (bootstrapping), you have the
+following three options:
+
+\begin{enumerate}
+\item If a Java runtime system (version 1.6 or higher) is installed, it will
+build right out of the box.
+\item Otherwise, download one of the pre-generated "*.s" file packages
+  \begin{itemize}
+  \item http://software-lab.de/x86-64.linux.tgz
+  \item http://software-lab.de/x86-64.sunOs.tgz
+  \item http://software-lab.de/ppc64.linux.tgz
+  \end{itemize}
+\item Else, build a 32-bit version first, and use the resulting
+  bin/picolisp to generate the "*.s" files:
+\begin{wideverbatim}
+$ (cd src; make)
+$ (cd src64; make x86-64.linux)
+\end{wideverbatim}
+After that, the 64-bit binary can be used to rebuild itself.
+
+Note that on the BSD family of operating systems, 'gmake' must be used
+instead of 'make'.
+\end{enumerate}
+
+
+\section{Global Installation}
+\label{sec:install-global-installation}
+
+The recommended way for a global installation is to use a picolisp
+package from the OS distribution.
+
+If that is not available, you can (as root) create four symbolic links
+from /usr/lib, /usr/share and /usr/bin to a local installation
+directory
+
+\begin{wideverbatim}
+   # ln -s /<installdir> /usr/lib/picolisp
+   # ln -s /<installdir> /usr/share/picolisp
+   # ln -s /usr/lib/picolisp/bin/picolisp /usr/bin/picolisp
+   # ln -s /usr/lib/picolisp/bin/pil /usr/bin/pil
+\end{wideverbatim}
+
+
+\section{Invocation}
+\label{sec:install-invocation}
+
+In a global installation, the 'pil' command should be used. You can
+either start in plain or in debug mode. The difference is that for
+debug mode the command is followed by single plus ('+') sign. The '+'
+must be the very last argument on the command line.
+
+\begin{wideverbatim}
+   $ pil       # Plain mode
+   :
+
+   $ pil +     # Debug mode
+   :
+\end{wideverbatim}
+
+In both cases, the colon ':' is PicoLisp's prompt. You may enter some
+Lisp expression,
+
+\begin{wideverbatim}
+ : (+ 1 2 3)
+   -> 6
+\end{wideverbatim}
+
+To exit the interpreter, enter
+
+\begin{wideverbatim}
+ : (bye)
+\end{wideverbatim}
+
+or just type Ctrl-D.
+
+For a local invocation, specify a path name, e.g.
+
+\begin{wideverbatim}
+   $ ./pil     # Plain mode
+   :
+
+   $ ./pil +   # Debug mode
+   :
+\end{wideverbatim}
+
+or
+\begin{wideverbatim}
+$ /home/app/pil  # Invoking a local installation from some other directory
+\end{wideverbatim}
+
+A shortcut for debug mode is the 'dbg' script:
+
+\begin{wideverbatim}
+   $ ./dbg
+   :
+\end{wideverbatim}
+
+It is available only for local installaions, and is eqivalent to
+\begin{wideverbatim}
+  $ ./pil +
+\end{wideverbatim}
+
+Note that 'pil' can also serve as a template for your own stand-alone scripts.
+
+If you just want to test the ready-to-run Ersatz PicoLisp (it needs a Java
+runtime system), use
+
+\begin{wideverbatim}
+   $ ersatz/pil +
+   :
+\end{wideverbatim}
+
+instead of './dbg' or './pil +'.
+
+\section{Documentation}
+\label{sec:install-documentation}
+
+For further information, please look at "doc/index.html". There you find the
+PicoLisp Reference Manual ("doc/ref.html"), the PicoLisp tutorials
+("doc/tut.html", "doc/app.html", "doc/select.html" and "doc/native.html"), and
+the frequently asked questions ("doc/faq.html").
+
+For details about the 64-bit version, refer to "doc64/README", "doc64/asm" and
+"doc64/structures".
+
+As always, the most accurate and complete documentation is the source code ;-)
+Included in the distribution are many utilities and pet projects, including
+tests, demo databases and servers, games (chess, minesweeper), 3D animation
+(flight simulator), and more.
+
+Any feedback is welcome!
+Hope you enjoy :-)
+

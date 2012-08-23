@@ -1,0 +1,356 @@
+\title{PicoLisp Ticker}
+\input{mainmatter/authors/alex}
+\maketitle
+
+% 16jul12
+% Alexander Burger
+
+% \documentclass[10pt,a4paper]{article}
+% \usepackage{graphicx}
+
+% \textwidth 1.4\textwidth
+% \textheight 1.125\textheight
+% \oddsidemargin 0em
+% \evensidemargin 0em
+% \headsep 0em
+% \parindent 0em
+% \parskip 6pt
+
+% \title{The PicoLisp Ticker}
+% \author{Alexander Burger\\abu@software-lab.de}
+% \date{2011-07-29}
+
+% \begin{document}
+% \maketitle
+
+\begin{abstract}
+This article describes how a \emph{PicoLisp Ticker} page is set up to produce
+an endless stream of pseudo-text, and how the \emph{Googlebot} reacts
+to such ``non-sensical'' data.       
+\end{abstract}
+
+\section{Producing an endless stream of pseudo-text}
+\label{sec:pl-ticker-producing-an-endless-stream-of-pseudo-text}
+
+Around end of May, I was playing with an algorithm I had received from \emph{Bengt
+Grahn}, many years ago. A small program - it was even part of the PicoLisp
+distribution (``misc/crap.l``) for many years - which when given an arbitrary
+sample text in some language, produces an endless stream of pseudo-text which
+strongly resembles that language.
+
+It was fun, so I decided to set up a PicoLisp ``Ticker'' page, producing a stream
+of ``news'': \underline{http://ticker.picolisp.com}\footnote{http://ticker.picolisp.com}
+
+\section{Implementing a ticker page}
+\label{sec:pl-ticker-implementing-a-ticker-page}
+
+The source for the server is simple:
+
+\begin{wideverbatim}
+   (allowed ()
+      *Page "!start" "@lib.css" "ticker.zip" )
+
+   (load "@lib/http.l" "@lib/xhtml.l")
+   (load "misc/crap.l")
+
+   (one *Page)
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+   (de start ()
+      (seed (time))
+      (html 0 "PicoLisp Ticker" "@lib.css" NIL
+         (<h2> NIL "Page " *Page)
+         (<div> 'em50
+            (do 3 (<p> NIL (crap 4)))
+            (<spread>
+               (<href> "Sources" "ticker.zip")
+               (<this> '*Page (inc *Page) "Next page") ) ) ) )
+
+   (de main ()
+      (learn "misc/ticker.txt") )
+
+   (de go ()
+      (server 21000 "!start") )
+\end{wideverbatim}
+
+The sample text for the learning phase, ``misc/ticker.txt``, is a
+plain text version of the PicoLisp
+\underline{FAQ}\footnote{http://software-lab.de/doc/faq.html}. The
+complete source, including the text generator, can be downloaded via
+the ``Sources'' link as ``ticker.zip''.
+
+Now look at the ``Next page'' link, appearing on the bottom right of
+the page. It always points to a page with a number one greater than
+the current page, providing an unlimited supply of ticker pages.
+
+I went ahead, and installed and started the server. To get some
+logging, I inserted the line
+
+\begin{wideverbatim}
+   (out 2 (prinl (stamp) " {" *Url "} Page " *Page "  [" *Adr "] " *Agent))
+\end{wideverbatim}
+
+at the beginning of the \texttt{start} function.
+
+\section{Googlebot in action}
+\label{sec:pl-ticker-googlebot-in-action}
+
+On June 18th I announced it on Twitter, and watched the log files. Immediately,
+within one or two seconds (!), Googlebot accessed it:
+
+\begin{wideverbatim}
+  2011-06-18 11:22:04  Page 1  [66.249.71.139] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+\end{wideverbatim}
+
+Wow, I thought, that was fast! Don't know if this was just by chance, or if
+Google always has such a close watch on Twitter.
+
+Anyway, I was curious about what the search engine would do with such nonsense
+text, and how it would handle the infinite number of pages. During the next
+seconds and minutes, other bots and possibly human users accessed the ticker:
+
+\begin{wideverbatim}
+
+  2011-06-18 11:22:08 Page 1 [65.52.23.76] Mozilla/4.0 (compatible;
+  MSIE 7.0; Windows NT 6.0)
+
+  2011-06-18 11:22:10 Page 1 [65.52.4.133] Mozilla/4.0 (compatible;
+  MSIE 7.0; Windows NT 6.0)
+
+  2011-06-18 11:22:20 Page 1 [50.16.239.111] Mozilla/5.0 (compatible;
+  Birubot/1.0) Gecko/2009032608 Firefox/3.0.8
+
+  2011-06-18 11:29:52 Page 1 [174.129.42.87] Python-urllib/2.6
+
+  2011-06-18 11:30:34 Page 1 [174.129.42.87] Python-urllib/2.6
+
+  2011-06-18 11:33:54 Page 1 [89.151.99.92] Mozilla/5.0 (compatible;
+  MSIE 6.0b; Windows NT 5.0) Gecko/2009011913 Firefox/3.0.6
+  TweetmemeBot
+
+  2011-06-18 11:33:5n4 Page 1 [89.151.99.92] Mozilla/5.0 (compatible;
+  MSIE 6.0b; Windows NT 5.0) Gecko/2009011913 Firefox/3.0.6
+  TweetmemeBot
+
+  2011-06-18 13:47:21 Page 1 [190.175.174.220] Mozilla/5.0 (X11; U;
+  Linux i686; en-US; rv:1.9.2.17) Gecko/20110428 Fedora/3.6.17-1.fc14
+  Firefox/3.6.17
+
+  2011-06-18 13:49:13 Page 2 [190.175.174.220] Mozilla/5.0 (X11; U;
+  Linux i686; en-US; rv:1.9.2.17) Gecko/20110428 Fedora/3.6.17-1.fc14
+  Firefox/3.6.17
+
+  2011-06-18 13:49:21 Page 3 [190.175.174.220] Mozilla/5.0 (X11; U;
+  Linux i686; en-US; rv:1.9.2.17) Gecko/20110428 Fedora/3.6.17-1.fc14
+  Firefox/3.6.17
+
+  2011-06-18 19:43:36 Page 1 [24.167.162.218] Mozilla/5.0 (X11; Linux
+  x86_64) AppleWebKit/534.30 (KHTML, like Gecko) Chrome/12.0.n742.91
+  Safari/534.30
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+  2011-06-18 19:43:54 Page 2 [24.167.162.218] Mozilla/5.0 (X11; Linux
+  x86_64) AppleWebKit/534.30 (KHTML, like Gecko) Chrome/12.0.742.91
+  Safari/534.30
+
+  2011-06-18 19:44:11 Page 3 [24.167.162.218] Mozilla/5.0 (X11; Linux
+  x86_64) AppleWebKit/534.30 (KHTML, like Gecko) Chrome/12.0.742.91
+  Safari/534.30
+
+  2011-06-18 19:44:13 Page 4 [24.167.162.218] Mozillan/5.0 (X11; Linux
+  x86_64) AppleWebKit/534.30 (KHTML, like Gecko) Chrome/12.0.742.91
+  Safari/534.30
+
+  2011-06-18 19:44:16 Page 5 [24.167.162.218] Mozilla/5.0 (X11; Linux
+  x86_64) AppleWebKit/534.30 (KHTML, like Gecko) Chrome/12.0.742.91
+  Safari/534.30
+
+  2011-06-18 19:44:18 Page 6 [24.167.162.218] Mozilla/5.0 (X11; Linux
+  x86_64) AppleWebKit/534.30 (KHTML, like Gecko) Chrome/12.0.742.91
+  Safari/534.30
+
+  2011-06-18 19:44:20 Page 7 [24.167.162.218] Mozilla/5.0 (X11; Linux
+  x86_64) AppleWebKit/534.30 (KHTML, like Gecko) Chrome/12.0.742.91
+  Safari/534.30
+
+\end{wideverbatim}
+
+Mr. Google came back the following day:
+
+\begin{wideverbatim}
+
+  2011-06-19 00:25:57 Page 2 [66.249.67.197] Mozilla/5.0 (compatible;
+  Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-06-19 01:03:13 Page 3 [66.249.67.197] Mozilla/5.0 (compatible;
+  Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-06-19 01:35:57 Page 4 [66.249.67.197] Mozilla/5.0 (compatible;
+  Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-06-19 02:39:19 Page 5 [66.249.67.197] Mozilla/5.0 (compatible;
+  Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-06-19 03:n43:39 Page 6 [66.249.67.197] Mozilla/5.0 (compatible;
+  Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-06-19 04:17:02 Page 7 [66.249.67.197] Mozilla/5.0 (compatible;
+  Googlebot/2.1; +http://www.google.com/bot.html)
+
+\end{wideverbatim}
+
+In between (not shown here) were also some accesses, probably by non-bots, who
+usually gave up after a few pages.
+
+Mr. Google, however, assiduously went through ``all'' pages. The page numbers
+increased sequentially, but he also re-visited page 1, going up again. Now there
+were several indexing threads, and by June 23rd the first one exceeded page 150.
+
+I felt sorry for poor Googlebot, and installed a ``robots.txt'' the same day,
+disallowing the ticker page for robots. I could see that several other bots
+fetched ``robots.txt''. But not Google. Instead, it kept following the pages of
+the ticker.
+
+Then, finally, on July 5th, Googlebot looked at ``robots.txt'':
+
+\begin{wideverbatim}
+
+  "robots.txt" 2011-07-05 07:03:05 Mozilla/5.0 (compatible;
+  Googlebot/2.1; +http://www.google.com/bot.html) ticker.picolisp.com
+  "robots.txt: disallowed all"
+
+\end{wideverbatim}
+
+The indexing, however, went on. Excerpt:
+
+\begin{wideverbatim}
+
+  2011-07-05 04:27:46 {!start} Page 500 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-07-05 04:58:50 {!start} Page 501 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-07-05 05:30:24 {!start} Page 502 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-07-05 06:02:10 {!start} Page 503 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-07-05 06:32:14 {!start} Page 504 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-07-05 07:02:41 {!start} Page 505 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-07-05 08:02:31 {!start} Page 506 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-07-05 08:45:52 {!start} Page 507 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+  2011-07-05 09:20:06 {!start} Page 508 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-07-05 09:51:49 {!start} Page 509 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+\end{wideverbatim}
+
+Strange. I would have expected the indexing to stop after Page 505.
+
+In fact, all other robots seem to obey ``robots.txt''. Mr. Google, however, even
+started a new thread five days later again:
+
+\begin{wideverbatim}
+
+  2011-07-10 02:22:52 {!start} Page 1 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+\end{wideverbatim}
+
+I should feel flattered, if the PicoLisp news ticker is so interesting!
+
+How will that go on? As of today, we have reached
+
+\begin{wideverbatim}
+
+  2011-07-15 09:42:36 {!start} Page 879 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+\end{wideverbatim}
+
+I'll stay tuned ...
+
+Now ... 8 hours later (17:10):
+
+As I wrote in the mailing list, I've extended ``robots.txt/default`` to exclude
+also ``/21000/`` from ''picolisp.com``. This was 14:58, two hours ago. Meanwhile,
+
+\begin{wideverbatim}
+
+  2011-07-15 15:29:59 {!start} Page 800 [74.125.94.84] Mozilla/5.0
+  (X11; Linux x86_64) AppleWebKit/534.24 (KHTML, like Gecko; Google
+  Web Preview) Chrome/11.0.696 Safari/534.24
+
+  2011-07-15 15:43:58 {!start} Page 889 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-07-15 16:13:54 {!start} Page 890 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+  2011-07-15 16:27:24 {!start} Page 1 [66.249.71.203] Mozilla/5.0
+  (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+\end{wideverbatim}
+
+we still have accesses, and even a restart from page one (which I wouldn't have
+expected now).
+
+As I wrote, ``robots.txt/default`` now looks like this:
+\begin{wideverbatim}
+   (prinl "User-Agent: *")
+
+   (prinl "Disallow:"
+      (cond
+         ((= *Host '`(chop "ticker.picolisp.com")) " /")
+         ((= *Host '`(chop "picolisp.com")) " /21000/") ) )
+\end{wideverbatim}
+
+Looking at the returned contents:
+\begin{wideverbatim}
+   : (client "ticker.picolisp.com" 80 "robots.txt" (out NIL (echo)))
+   User-Agent: *
+   Disallow: /
+\end{wideverbatim}
+
+and
+\begin{wideverbatim}
+   : (client "picolisp.com" 80 "robots.txt" (out NIL (echo)))
+   User-Agent: *
+   Disallow: /21000/
+\end{wideverbatim}
+
+
+... next morning
+
+Good! This helped. Googlebot seems to have stopped all traversals.
+
+The log entry at 16:27 yesterday is the last one.
+
+In summary, I can't blame Google. It was actually my fault not to explicitly
+disallow /21000/, because for a bot the links looks like pointing to a different
+site. Just disabling the ``root'' of the traversal is not enough; there is no
+garbage collector involved.
+

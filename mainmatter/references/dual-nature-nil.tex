@@ -1,0 +1,97 @@
+\title{The Dual Nature of NIL}
+\input{mainmatter/authors/alex}
+\maketitle
+
+% 16jul12
+% Alexander Burger
+
+% \documentclass[10pt,a4paper]{article}
+% \usepackage{graphicx}
+
+% \textwidth 1.4\textwidth
+% \textheight 1.125\textheight
+% \oddsidemargin 0em
+% \evensidemargin 0em
+% \headsep 0em
+% \parindent 0em
+% \parskip 6pt
+
+% \title{The Dual Nature of NIL}
+% \author{Alexander Burger\\abu@software-lab.de}
+% \date{2012-06-07}
+
+% \begin{document}
+% \maketitle
+
+\begin{abstract}
+  In this article, the dual nature of \texttt{NIL} as symbol and cons
+  pair, a basic design requirement of PicoLisp, is discussed. 
+\end{abstract}
+
+\section{The Dual Nature of NIL}
+\label{sec:dual-nature-nil}
+
+\texttt{NIL} is a very fundamental piece of data. It has a dual
+nature, being both a symbol \textit{and} a cons pair of the form
+\texttt{(NIL . NIL)}. From the beginning, this has been a basic design
+requirement of PicoLisp.
+
+As shown in ``doc64/structures`` (similar also in ''doc/structures``):
+
+\begin{wideverbatim}
+      NIL:  /
+            |
+            V
+      +-----+-----+-----+-----+
+      |'LIN'|  /  |  /  |  /  |
+      +-----+--+--+-----+-----+
+\end{wideverbatim}
+
+Physically, the pointer to \texttt{NIL} (shown with the 'V' in the
+above diagram) is a true symbol, as it points at an offset of a
+pointer size into the memory heap. Taken as such, \texttt{NIL} is a
+normal symbol,
+
+\begin{wideverbatim}
+      NIL:  /
+            |
+            V
+      +-----+-----+
+      |'LIN'|  /  |
+      +-----+--+--+
+\end{wideverbatim}
+
+having a tail with the characters 'N', 'I' and 'L' (the name), and a
+value which in turn points to \texttt{NIL} (symbolized with the '/').
+
+However, when this pointer is boldly used as a cell pointer (by
+ignoring the pointer tags caused by the pointer size offset)
+
+\begin{wideverbatim}
+      NIL:  /
+            |
+            V
+            +-----+-----+
+            |  /  |  /  |
+            +--+--+-----+
+\end{wideverbatim}
+
+then it is a normal cons pair, with \texttt{NIL} in its CAR and
+\texttt{NIL} in its CDR, which just happens to be misaligned in memory
+(i.e. at the place of a symbol).
+
+This structure has great advantages. Any proper list (ending with
+\texttt{NIL}) becomes sort of ``infinite'', allowing to take the CDR
+as often as possible and still obtain \texttt{NIL} again and again.
+
+Therefore, a function doesn't need to check whether it actually
+received an argument or not. It can simply take the next argument with
+CDR from the argument list, and doesn't see any difference between
+\texttt{(foo NIL)} and \texttt{(foo)}. This makes interpretation both
+simpler and faster.
+
+
+% Local variables:
+% mode: latex
+% TeX-master: "../../editor.tex"
+% End:

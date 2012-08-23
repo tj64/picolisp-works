@@ -1,0 +1,284 @@
+\title{Advanced OODB in PicoLisp}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+\section{Assumptions}
+\label{sec:advanced-oodb}
+
+In this tutorial I will assume you've already glanced at the documents I
+linked to in the prior article. I hope you still have cms.db intact.
+
+
+\begin{wideverbatim}
+# Copy paste relations and classes from the prior 
+# article here, nothing has changed
+
+(pool "cms.db")
+
+(? 
+ (select (@A) 
+         ((tag +Tag "pc" (tags +Article)))
+         (tolr "computer" @A body) 
+ (show @A)))
+\end{wideverbatim}
+
+\section{Using select}
+\label{sec:advanced-oodb}
+
+A lot easier than the approach we employed in the prior tutorial,
+\textbf{select} will first take generators, in our case only
+\texttt{(tag +Tag ``pc'' (tags +Article))}. It will go through the
+tags and when we find one with tag ``pc'' we will continue and
+retrieve all articles connected through the tags reference. Next comes
+an arbitrary amount of filter clausfes, in our case only one: \texttt{(tolr
+``computer'' @A body)}. \textbf{tolr} is a shortcut for tolerant which
+means we do partials too. Try replacing ``computer'' with ``comp'' and
+the result will be the same.
+
+The result is of course a list with all articles who are tagged with
+``pc'' and contain the substring ``computer'' in their article bodies.
+
+\begin{wideverbatim}
+(? 
+ (select (@A) 
+         ((tag +Tag "pc" (tags +Article)))
+         (tolr "computer" @A body)
+         (same "sam" @A author username)
+         (same "tech" @A folder slug)
+ (show @A)))
+\end{wideverbatim}
+
+The only addition here is more filtering through the author and folder
+references. We now get a list of all articles tagged with ``pc'', written
+by Sam, containing ``computer'' in their bodies and located in the ``tech''
+folder, feel free to contemplate the equivalent SQL \dots{}
+
+\section{Pilog example}
+\label{sec:advanced-oodb}
+
+\subsection{Select and insert}
+\label{sec:advanced-oodb}
+
+As you might know already this all works through
+\href{http://www.software-lab.de/ref.html#pilog}{Pilog} which is a
+PicoLisp implementation of
+\href{http://en.wikipedia.org/wiki/Prolog}{Prolog}. To understand how
+it works let's play around a little with \textbf{be} and a Pilog
+version of the
+\href{http://www.swi-prolog.org/documentation.html}{SWI-Prolog
+  tutorial}:
+
+
+\begin{wideverbatim}
+(be Indian (vindaloo))
+(be Indian (dahl))
+(be Indian (tandoori))
+(be Indian (kurma))
+(be mild (dahl))
+(be mild (tandoori))
+(be mild (kurma))
+(be Chinese (chow-mein))
+(be Chinese (chop-suey))
+(be Chinese (sweet-and-sour))
+(be Italian (pizza))
+(be Italian (spaghetti))
+
+(be likes (Sam @F) (Indian @F) (mild @F))
+(be likes (Sam @F) (Chinese @F))
+(be likes (Sam @F) (Italian @F))
+(be likes (Sam chips))
+
+(? (likes Sam @F))
+\end{wideverbatim}
+
+Yep, Sam likes Indian food but only the mild curries, vindaloo doesn't
+fall into that category, that's why it's missing in the output. This
+is the mechanism behind our OODB queries. The \textbf{same} and
+\textbf{tolr} keywords we use above are in fact set with \textbf{be}
+in pilog.l.
+
+Let's continue with some simple pagination:
+
+\begin{wideverbatim}
+(new! '(+Article) 'slug "new-pcs-in-2008" 'headline "New PC's in 2008" 
+'body "An article about all the new PC's in 2008." 'author (db 'username '+User "sam"))
+
+(setq *Query (goal '(@Headline "2008" (db headline +Article @Headline @A))))
+
+(do 2 (bind (prove *Query) (println (get @A 'headline))))
+\end{wideverbatim}
+
+There are two new things here \textbf{goal} and \textbf{prove}. Until
+now we have used the shortcut \textbf{?} to do both at the same time.
+Goal will prepare a Lisp statement by turning it into a valid query
+that the Pilog engine can prove or disprove like we are doing above
+with Sam and his food. Try printing \texttt{*Query} to see what it
+looks like. In this case repeated calls to the last line will retrieve
+the results two by two because prove will return the next result which
+makes it ideal to call repeatedly to get the next two and then the
+next two and so on. Try this instead:
+
+
+\begin{wideverbatim}
+(setq *Query (goal '(@Headline "2008" (db headline +Article @Headline @A))))
+(do 1 (bind (prove *Query) (println (get @A 'headline))))
+(do 1 (bind (prove *Query) (println (get @A 'headline))))
+\end{wideverbatim}
+
+In a ``sharp'' situation we could have called that last line to fetch
+the next result when our user presses a next button for instance.
+Notice also the necessary ``preparation'' of 2008 with
+\texttt{@Headline} at the beginning of the quoted list we pass to
+goal.
+
+\subsection{Updating and Deleting}
+\label{sec:advanced-oodb}
+
+Until now we have only selected and inserted things, let's look at ways
+to change and delete our data. As you know most of our articles are
+tagged with ``fun'', this is how we could remove that tag from our tech
+folder/article:
+
+
+\begin{wideverbatim}
+(del!> (db 'slug '+Article "tech") 'tags (db 'tag '+Tag "fun"))
+(mapcar show (collect 'slug '+Article))
+\end{wideverbatim}
+
+Note how \textbf{del!\textgreater} automatically deletes the fun tag from the reference
+list in the tech article. Updating a pure value is just a matter of
+putting again:
+
+
+\begin{wideverbatim}
+(put!> (db 'slug '+Article "tech") 'headline "The technology folder")
+(mapcar show (collect 'slug '+Article))
+\end{wideverbatim}
+
+Let's get rid of the fun tag altogether:
+
+
+\begin{wideverbatim}
+(lose!> (db 'tag '+Tag "fun"))
+(mapcar show (collect 'slug '+Article))
+\end{wideverbatim}
+
+The tag is gone but the references are still there, in my case the fun
+tag was \texttt{\{P\}} and the \texttt{\{P\}} still shows in the tag
+list of each article. So we have a case of orphaning, sometimes it's a
+wanted behavior, not now though so let's get rid of the reference:
+
+\begin{wideverbatim}
+(for Article (collect 'tags '+Article '{P})
+     (put!> Article 'tags (delete '{P} (get Article 'tags))))
+
+(mapcar show (collect 'slug '+Article))
+\end{wideverbatim}
+
+
+The \textbf{for} loop is the PicoLisp version of the old ``for in'' or
+``for each''. We collect all articles that are referring to the fun
+tag (\texttt{\{P\}}). After that we get the tag list in question, delete the
+fun reference and finally put it back. With that in mind we could
+create a custom \textbf{lose} method:
+
+\begin{wideverbatim}
+(extend +Entity)
+(dm loseref!> ()
+    (for Child (var: Cascade) 
+         (let (ChildClass (car Child) ChildRef (cdr Child)) 
+           (for Element (collect ChildRef ChildClass This)
+                (put!> Element ChildRef (delete This (get Element ChildRef))))))
+    (lose!> This))
+
+(class +User +Entity)
+(rel username (+Need +Key +String))
+(rel password (+Need +String))
+
+(class +Article +Entity)
+(rel slug     (+Need +Key +String))
+(rel headline (+Need +Idx +String))
+(rel body     (+Need +String))
+(rel author   (+Ref +Link) NIL (+User))
+(rel folder   (+Ref +Link) NIL (+Article))
+(rel tags     (+List +Ref +Link) NIL (+Tag))
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+(class +Tag +Entity)
+(rel tag (+Need +Key +String))
+(var Cascade . ((+Article . tags)))
+
+(pool "cms.db")
+
+(loseref!> (db 'tag '+Tag "pc"))
+
+(mapcar show (collect 'slug '+Article))
+\end{wideverbatim}
+
+This is just repetition of the above with the addition of a Cascade
+list that we loop through to find which classes are affected (in our
+case only \texttt{+Article}) and the name of the reference to use
+\texttt{(tags)}. Note the use of \emph{class variables} (which I
+forgot to mention in the simple OO tutorial). We initiate a class
+variable with \textbf{var} and retrieve it with \textbf{var:}.
+
+That was one way of doing it, another is to inspect the relations and
+use that information to do the cleanup. The problem with this is that it
+will delete all references in all tagged objects. Pretend you had
+something else in the system that you are tagging, \texttt{+Novel}(s) for
+instance. If you only wanted to remove the specific tag for articles,
+not novels you would have to specifically state that somewhere and you
+are back to something like the above. However, if this is not a problem
+you could do like this instead:
+
+\begin{wideverbatim}
+(extend +Entity)
+(dm loseref!> ()
+    (for Child (getRefs> This) 
+         (let (ChildClass (car Child) ChildRef (cdr Child)) 
+           (for Element (collect ChildRef ChildClass This)
+                (put!> Element ChildRef (delete This (get Element ChildRef))))))
+    (lose!> This))
+
+(dm getRefs> ()
+    (make 
+     (for Class (all)
+          (when (isa '+Entity Class) 
+            (for El (getl Class) 
+                 (and 
+                  (isa '(+Ref +Link) (car El))
+                  (= (list *Class) (get El 1 'type))
+                  (link (cons Class (cdr El)))))))))
+
+\end{wideverbatim}
+
+\begin{wideverbatim}
+
+
+# Relations here without the (var Cascade . ((+Article . tags))) line.
+
+(pool "cms.db")
+
+(loseref!> (db 'tag '+Tag "scuba"))
+
+(mapcar show (collect 'slug '+Article))
+\end{wideverbatim}
+
+\texttt{GetRefs>} will loop through all symbols currently loaded, when
+the symbol is an \texttt{+Entity} we fetch the whole property list
+from the symbol.
+
+We loop through all properties and check if they have \texttt{+Ref
+  +Link}, if yes we check if the current class accessed through the
+\texttt{*Class} global is equal to the type we fetch from the
+\texttt{car} of \texttt{El}, yes \texttt{(get (car El) ‘type)} would
+have worked too. If they are equal we move on and \textbf{link} a
+\textbf{cons} pair to the list.
+
+We get the name of the relation with \texttt{(cdr El)}, the result is
+identical to the explicitly set \texttt{((+Article . tags))} in the
+prior example.
+

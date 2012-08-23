@@ -1,0 +1,76 @@
+% 18aug12
+% Jon Kleiser
+
+\documentclass[10pt,a4paper]{article}
+\usepackage{graphicx}
+
+\textwidth 1.4\textwidth
+\textheight 1.125\textheight
+\oddsidemargin 0em
+\evensidemargin 0em
+\headsep 0em
+\parindent 0em
+\parskip 6pt
+
+\title{Swing REPL written in Ersatz PicoLisp}
+\author{Jon Kleiser\\jon.kleiser@usit.uio.no}
+\date{2012-01-01}
+
+\begin{document}
+\maketitle
+
+\section*{Swing REPL written in Ersatz PicoLisp}
+This is just a very simple illustration of what can be done combining PicoLisp and Java.
+Go ahead and make your own more powerful version!
+
+\begin{verbatim}
+#!ersatz/pil
+
+(setq
+   Frame (java "javax.swing.JFrame" T "Ersatz PicoLisp")
+   ContPane (java Frame 'getContentPane)
+   ResOut (java "javax.swing.JTextArea" T 5 20)
+   ProgIn (java "javax.swing.JTextArea" T "(prinl 11) (+ 22 33)") )
+
+(de isReturnKey (KeyCode)
+   (= (java KeyCode) 10) )
+
+(de handleKeyEvent (KeyEvt)
+   (let (KeyCode (java KeyEvt 'getKeyCode)
+         KeyText (java KeyEvt 'getKeyText KeyCode) )
+      #(prinl KeyCode " " KeyText) (java ResOut 'append KeyText)
+      (when (isReturnKey KeyCode)
+         (let (ProgText (java ProgIn 'getText)
+               Prog (str ProgText)
+               Result (run Prog) )
+            #(java ResOut 'append (pack (pack (clip (chop ProgText))) "^J"))
+            (java ResOut 'append (pack (sym Prog) "^J"))
+            (java ResOut 'append (pack "-> " (sym Result) "^J")) ) ) ) )
+
+(let Font (java "java.awt.Font" T "Verdana" 0 16)
+   (java ResOut 'setFont Font)
+   (java ProgIn 'setFont Font) )
+
+(java ProgIn 'addKeyListener
+   (interface "java.awt.event.KeyListener"
+      'keyTyped nil
+      'keyPressed handleKeyEvent
+      'keyReleased nil ) )
+
+(java ContPane 'setLayout (java "javax.swing.BoxLayout" T ContPane
+   (public "javax.swing.BoxLayout" 'Y_AXIS) ) )
+(java ContPane 'add (java "javax.swing.JScrollPane" T ResOut))
+(java ContPane 'add (java "javax.swing.JScrollPane" T ProgIn))
+
+(java Frame 'pack)
+(java Frame 'setLocation 60 80)
+(java Frame 'setSize 600 400)
+(java Frame 'setDefaultCloseOperation (public "javax.swing.JFrame" 'EXIT_ON_CLOSE))
+(java Frame 'setVisible T)
+
+(java ProgIn 'grabFocus)
+(let ProgLen (length (java ProgIn 'getText))
+   (java ProgIn 'setSelectionEnd ProgLen)
+   (java ProgIn 'setSelectionStart ProgLen) )
+\end{verbatim}
+\end{document}

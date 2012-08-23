@@ -1,0 +1,192 @@
+% 18aug12
+% joebo
+
+\documentclass[10pt,a4paper]{article}
+\usepackage{graphicx}
+
+\textwidth 1.4\textwidth
+\textheight 1.125\textheight
+\oddsidemargin 0em
+\evensidemargin 0em
+\headsep 0em
+\parindent 0em
+\parskip 6pt
+
+\title{Summary}
+\author{joebo\\joebogner@gmail.com}
+\date{2012-02-23}
+
+\begin{document}
+\maketitle
+
+\section*{Summary}
+PicoLisp can be compiled for android and a simple web server can be created.
+
+To make it easier to work on the device, I strongly suggest \underline{Terminal IDE}\footnote{http://www.spartacusrex.com/terminalide.htm}
+
+Telnetting into the device is optional - much easier than using a keyboard I found.
+
+\begin{verbatim}
+ISSUES:
+1. Initially the externally defined functions would not work, e.g. ht:Pack.
+   I was able to work around it for ht:Pack by compiling in ht.c and then manually defining it.
+   I found other issues though with other externals and stopped due to time
+2. Because of this, I can't run (html) or (http) by default
+\end{verbatim}
+
+
+\begin{verbatim}
+Bootstrapped Steps:
+1. Install Terminal IDE from the android market
+2. Telnet into your device
+
+For this, I've had the most success with running utelneted manually after starting terminal IDE)
+  2a. Launch Terminal IDE
+  2b. Run the following:
+
+  utelnetd -p 2300 -l $HOME/system/bin/bash
+
+  2c. Terminal IDE outputs your IP address on the shell
+      terminal++@192.168.2.5:~/
+
+3. Once connected through telnet, fetch arm-picoLisp.tar.gz from my dropbox account
+
+   wget http://107.20.234.233/u/20783971/arm-picoLisp.tar.gz
+
+   *Note: IP Address is used because Terminal IDE can't resolve host names without a rooted device and /resolve.conf
+
+4. mv arm-picoLisp.tar.gz to ~/bin
+
+5. tar -zxvf arm-picoLisp.tar.gz
+
+6. ./pil
+
+\end{verbatim}
+
+
+To fire up a web server:
+
+\begin{verbatim}
+./pil lib/http.l
+
+(redef http (S)
+  (in S (line))
+  (out S (prinl "Hello World!")))
+
+(server 8001)
+
+\end{verbatim}
+
+
+Alternate server:
+
+As you can see, we need to define ht:Pack. I could have added it to a file but wanted it here to be transparent
+
+\begin{verbatim}
+ ./pil @lib/http.l @lib/xhtml.l -'(de ht:Pack (U) (pack U))' -'server 8001 "test.l"' -wait
+:\end{verbatim}
+
+
+test.l
+\begin{verbatim}
+  (prinl "hello!")
+\end{verbatim}
+
+
+
+\begin{verbatim}
+FULL STEPS:
+
+1. On ubuntu, install gcc-4.4-arm-linux-gnueabi
+
+   sudo apt-get install gcc-4.4-arm-linux-gnueabi
+
+2. Replace Makefile
+
+abbreviated form here. You can see the full version in the tar.gz above]
+Main changes:
+ a. replace gcc with $(CC)
+ b. make it statically link
+ c. remove flags that aren't compatible with  arm-linux-gnueabi-gcc-4.4]
+
+
+3. make
+
+\end{verbatim}
+
+
+Makefile
+\begin{verbatim}
+
+bin = ../bin
+lib = ../lib
+
+picoFiles = main.c gc.c apply.c flow.c sym.c subr.c big.c io.c net.c tab.c ht.c
+
+CC := arm-linux-gnueabi-gcc-4.4
+CFLAGS := -c -O2 -pipe \
+	-falign-functions -fomit-frame-pointer -fno-strict-aliasing \
+	-W -Wimplicit -Wreturn-type -Wunused -Wformat \
+	-Wuninitialized -Wstrict-prototypes \
+	-D_GNU_SOURCE  -D_FILE_OFFSET_BITS=64
+
+
+	OS = Linux
+	PICOLISP-FLAGS =
+	LIB-FLAGS = -static -lc -lm -ldl
+	DYNAMIC-LIB-FLAGS = -m32 -static -export-dynamic
+	STRIP =
+
+
+picolisp: $(bin)/picolisp
+
+all: picolisp
+
+.c.o:
+	$(CC) $(CFLAGS) -D_OS='"$(OS)"' $*.c
+
+
+$(picoFiles:.c=.o) ext.o ht.o z3d.o: pico.h
+main.o: vers.h
+
+
+$(bin)/picolisp: $(picoFiles:.c=.o)
+	mkdir -p $(bin) $(lib)
+	$(CC) -o $(bin)/picolisp$(exe) $(PICOLISP-FLAGS) $(picoFiles:.c=.o) $(LIB-FLAGS)
+
+
+# Clean up
+clean:
+	rm -f *.o
+
+\end{verbatim}
+
+
+\section*{Open Issues}
+I haven't yet figured out how to port ht:Out. This is my current progress:
+
+\begin{verbatim}
+
+: (de ht:Out (flg . prg) (out flg prg))
+
+: -> ht:Out
+:(html 0 "bye" NIL NIL "foo")
+
+HTTP/1.0 200 OK
+Server: PicoLisp
+Date: Thu, 23 Feb 2012 15:35:04 GMT
+Cache-Control: max-age=0
+Cache-Control: private, no-store, no-cache
+Content-Type: text/html; charset=utf-8
+
+-> ((prinl "<!DOCTYPE html>")
+(prinl "<html lang=\"" (or *Lang "en") "\">") (prinl "<head>")
+(and Ttl (<tag> 'title NIL Ttl) (prinl)) (and *Host *Port
+(prinl "<base href=\"" (baseHRef) "\"/>")) (when Css (if (atom Css)
+("css" Css) (mapc "css" Css))) (mapc javascript *JS) (prinl "</head>")
+(tag 'body Attr 2 Prg) (prinl "</html>"))
+: :
+\end{verbatim}
+
+
+As you can see I think it should be evaulating what comes after the header.\end{document}

@@ -1,0 +1,141 @@
+\title{Factorials, Permutations and Recursion in PicoLisp}
+\input{mainmatter/authors/henrik}
+\maketitle
+
+\begin{abstract}
+  This article describes \emph{factorials}, \emph{permutations} and
+  \emph{recusrion} can be used in the simulation of stock trading
+  strategies.  
+\end{abstract}
+
+\section{Simulating stock trading strategies}
+\label{sec:fact-perm-recur-simulating-stock-trading-strategies}
+
+Currently I'm simulating trading strategies on historical stock data.
+Yes I know according to
+\href{http://en.wikipedia.org/wiki/Nassim_taleb}{Nassim} this is
+complete bullshit but I might beg to differ. At least I feel the need
+to determine if it's bullshit on my own than just take his word for it.
+
+I have bought trading data from the SET which includes the years
+1975--2008, the period 1997--2001 could possibly closely resemble what
+we are up against at the moment so any simulated strategy that returns
+more than simply sitting on the sidelines and doing nothing is a winner
+and might be worth testing at the moment.
+
+\section{Factorials and Permutation}
+\label{sec:fact-perm-recur-factorials-and-permutation}
+
+
+\subsection{First try}
+\label{sec:fact-perm-recur-first-try}
+
+However in order to simulate these strategies we need to be able to do
+permutations and I couldn't find anything already created to this
+effect, neither could I find a core factorial function, so here they
+are:
+
+\begin{wideverbatim}
+(de fac (Num)
+   (let Res 1
+      (for (N 1 (>= Num N) (inc N))
+         (setq Res (* Res N)))))
+\end{wideverbatim}
+
+So this one is basically the same as ye old ``N!''.
+
+\begin{wideverbatim}
+(de switch (Lst P1 P2)
+  (let (V1 (get Lst P1) V2 (get Lst P2))      
+      (place P1 (place P2 Lst V1) V2)))
+\end{wideverbatim}
+
+This one is used in the permutate function below, however it might be of
+use in a standalone fashion, hence it having its own definition. Anyway
+the end result is a switch of the values indicated by the numbers in P1
+and P2.
+
+\subsection{Using \texttt{recur} and \texttt{recurse}}
+\label{sec:fact-perm-recur-using-recur}
+
+\begin{wideverbatim}
+(de permutate (Lst)      
+   (let (Result (list) Count 1 Start 1) 
+      (recur (Lst Start Result Count) 
+         (when (>= (fac (length Lst)) Count)
+            (push Result Lst)
+            (when (= Start (length Lst)) (setq Start 1))
+            (recurse 
+               (switch Lst Start (inc Start)) 
+               (inc Start) 
+               Result 
+               (inc Count)))
+         (car Result))))
+\end{wideverbatim}
+
+Note \textbf{recur} and \textbf{recurse} here, we might just have
+created a different non-recursive entry function instead but using
+these two is a more lazy approach that lets us dispense with the need
+to create two different definitions.
+
+The end result is a list of lists with all different permutations.
+
+Anyway, I will put this stuff up for inspection on the Pico Lisp mailing
+list and let more knowledgeable people give feedback, updates with new
+code and comments will most likely appear here in the near future. 
+
+\textbf{Update}: OK so it didn't work, I created the above based on an
+(1 2 3) example list, however in my sharp application I work with 4
+numbers and it didn't manage that, I'll leave it though as an example
+of how recursion can be done in PicoLisp.
+
+\subsection{Second try}
+\label{sec:fact-perm-recur-second-try}
+
+I ended up stealing one of the algorithms from the
+\href{http://en.wikipedia.org/wiki/Permutation}{permutation Wikipedia}
+article, and this is the result:
+
+
+\begin{wideverbatim}
+(de permutation (N Lst)
+   (for (J 2 (>= (length Lst) J) (inc J))
+      (setq N (/ N (- J 1)))
+      (setq Lst (switch Lst (inc (% N J)) J))))
+   
+(de permutate (Lst)
+   (let Rslt (list)
+      (for (N 1 (>= (fac (length Lst)) N) (inc N))
+         (push Rslt (permutation N Lst)))
+      (uniq (car Rslt))))
+\end{wideverbatim}
+
+Everything else equal.
+
+\subsection{Using \texttt{permute}}
+\label{sec:fact-perm-recur-using-permute}
+
+\textbf{Update}: So I got my answer from Alex on the mailing list:
+
+\begin{quote}
+Well, there is the `permute' function in ``lib/simul.l''. Does it what
+you intend?
+\end{quote}
+
+
+\begin{wideverbatim}
+(de permute (Lst)
+   (ifn (cdr Lst)
+      (cons Lst)
+      (mapcan
+         '((X)
+            (mapcar
+               '((Y) (cons X Y))
+               (permute (delete X Lst)) ) )
+         Lst ) ) )
+\end{wideverbatim}
+
+Indeed, and very nice, excellent solution, I wish my mind was lispy
+enough to come up with these things myself. If you encapsulate the
+recursive permute call in a println you will get a feeling for how it
+works.

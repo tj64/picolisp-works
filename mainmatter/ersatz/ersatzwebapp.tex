@@ -1,0 +1,382 @@
+% 18aug12
+% joebo
+
+\documentclass[10pt,a4paper]{article}
+\usepackage{graphicx}
+
+\textwidth 1.4\textwidth
+\textheight 1.125\textheight
+\oddsidemargin 0em
+\evensidemargin 0em
+\headsep 0em
+\parindent 0em
+\parskip 6pt
+
+\title{Example Web App using Ersatz PicoLisp}
+\author{joebo\\joebogner@gmail.com}
+\date{2012-01-31}
+
+\begin{document}
+\maketitle
+
+\section*{Example Web App using Ersatz PicoLisp}
+
+\subsection*{Pre-requisites}
+\begin{enumerate}
+   \item Modified Ersatz (PicoLispEmbedded.jar)
+\item \underline{Simple}\footnote{http://www.simpleframework.org/}
+\item \underline{http://www.hsqldb.org/}\footnote{http://www.hsqldb.org/} HypeSQL java db
+\end{enumerate}
+
+\subsection*{Download}
+I've uploaded all the source for this example. You can also try it out at \underline{http://joebo.xen.prgmr.com:8080/}\footnote{http://joebo.xen.prgmr.com:8080/} It may not be running for very long. If you want to try it let me know and I'll start it up.
+
+Or with this source example file. You will need to rename to a .zip
+
+\section*{Goal}
+The goal of this example is to demonstrate a web application that can run on both Windows and Linux using PicoLisp.
+
+\section*{Performance}
+I don't have all the comparisons ready, but I was just trying to determine roughly how it performs. On my shared host using apache benchmark with 30 concurrent requests:
+
+\begin{enumerate}
+   \item This Example (ServerRunner): 7 reqs/seq)
+\item Clojure web-noir example: 8 reqs/seq \underline{Example}\footnote{http://webnoir.org/})
+\item Basic Wordpress site running under php-fcgi: 4 reqs/seq
+\item Basic elgg site running under php-fcgi: 3 reqs/seq
+\end{enumerate}
+
+On my dual-core laptop this example ran at 18 reqs/sec on windows.
+
+I'm guessing using HyperSQL knocks my throughput down some. I recall getting about 22 req/seq on just a ``hello world'' example on this machine.
+
+
+\section*{Web app}
+
+\textbf{page.l}
+\\
+This is is the single page web app. It uses jquery and twitter bootstrap to make it more modern looking and responsive. Since ersatz has no native db, it uses HyperSQL.
+
+\begin{verbatim}
+(setq *DB "jdbc:hsqldb:foo.db")
+(load "hql.l")
+(de decode (X) (java (java 'java.net.URLDecoder 'decode X "UTF-8")))
+(setq *Post (make (mapcar '((X) (link (cons (pack (car (split X "="))) (decode (pack (cdr (split X "="))))))) (split (chop *Form) "&"))))
+
+
+(de html (Target)
+   (char)
+   (setq Target (chop Target))
+   (make
+      (for (L (line)  (and L (<> L Target))  (line))
+		(setq Replace (match '(@A ~(chop "<%=Table%>") @B) L))
+		(if Replace (setq L (pack @A Table @B)))
+         (link L) ) ) )
+
+(off Name)
+
+(if (= (chop *Method) (chop "POST"))
+	(cond
+		((= (chop "/task/new") (chop *Path))
+			(sql-execute (pack "INSERT INTO todo (text, done) VALUES('" (cdr (assoc "Todo" *Post)) "',0)" )) )
+		((= (chop "/task/delete") (chop *Path))
+			(sql-execute (pack "DELETE FROM todo WHERE ID='" (cdr (assoc "id" *Post)) "'" )) )) )
+
+(setq Todos (sql-query "SELECT * FROM todo"))
+(setq Table (pack (mapcar '((X)
+	(list "<tr>"
+		"<td class='id'>" (cdr (assoc "ID" X)) "</td>"
+		"<td>" (cdr (assoc "TEXT" X)) "</td>"
+		"<td class='action'><input type='button' class='btn danger done' value='Delete' data-ID="  (cdr (assoc "ID" X)) "></td>"
+		"</tr>" )) Todos)))
+
+(setq Var (mapcar clip (html "END_DOC")))
+<!DOCTYPE html>
+<html>
+<link rel="stylesheet" href="http://twitter.github.com/bootstrap/1.4.0/bootstrap.min.css">
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+<style>
+	.action {width:75px; }
+	.id { width: 50px; }
+</style>
+<script>
+$(function() {
+	$('#Submit').click(function() {
+		$.post('/task/new', $('form').serialize(), function(resp) {
+			$('#Todos table').replaceWith($(resp).find('#Todos table'));
+			$('#Todo').val('');
+			$('#Todos').trigger('load');
+		}, 'html');
+		return false;
+	});
+	$('#Todos').bind('load', function() {
+		$('.done').click(function() {
+			$.post('/task/delete',{id: $(this).attr("data-ID")}, function(resp) {
+				$('#Todos table').replaceWith($(resp).find('#Todos table'));
+				$('#Todos').trigger('load');
+			}, 'html');
+			return false;
+		});
+	}).trigger('load');
+})
+</script>
+<div class="row">&nbsp;</div>
+<div class="container">
+	<div class="hero-unit" style="text-align:center">
+		<h3>Create a TODO</h3>
+		<form method="post">
+		<input type="text" id="Todo" name="Todo">
+		<input type="button" class="btn primary" id="Submit" value="Save">
+		</form>
+	</div>
+	<div id="Todos">
+	<table class="bordered-table">
+	<thead>
+		<tr>
+			<th>ID</th>
+			<th>Text</th>
+			<th></th>
+		</tr>
+	</thead>
+	<tbody>
+		<%=Table%>
+	</tbody>
+	</table>
+</div>
+</div>
+</html>
+END_DOC
+
+(setq Var (chop (pack (mapcar clip Var))))
+(de ht:out (X) (java *Body 'println X))
+(ht:out (pack Var))
+
+# (execute "CREATE TABLE todo (id int identity, text varchar(400), done bit)")
+\end{verbatim}
+
+
+\textbf{hql.l - bad name, I know}
+\\
+This is a helper library for executing SQL. In the future, I'd like to make the interface generic so I can swap in an implementation for native PicoLisp database or a different jdbc database.
+
+\begin{verbatim}
+(default *DB "NODB")
+(de sql-query (sql)
+	(de makeRow ()
+		(make
+			(for (N 1 (>= Count N) (inc N))
+			  (setq Name (java (java Meta 'getColumnName N)))
+			  (link (cons Name (java (java Query 'getString Name )))) ) ) )
+
+  (java "java.lang.Class" "forName" "org.hsqldb.jdbc.JDBCDriver")
+  (setq Conn (java "java.sql.DriverManager" "getConnection" *DB))
+  (setq St (java Conn "createStatement"))
+  (setq Query (java St 'executeQuery sql))
+  (setq Meta (java Query 'getMetaData))
+  (setq Count (java (java Meta 'getColumnCount)))
+  (setq Rows
+    (make
+      (loop
+        (T (nT (java (java Query 'next))))
+        (link (makeRow)) ) ) )
+  (java Conn 'close)
+  Rows)
+
+(de sql-execute (sql)
+  (java "java.lang.Class" "forName" "org.hsqldb.jdbc.JDBCDriver")
+  (setq Conn (java "java.sql.DriverManager" "getConnection" *DB))
+  (setq St (java Conn "createStatement"))
+  (setq Result (java St 'executeUpdate sql))
+  (java Conn 'close)
+  (java Result) )
+
+\end{verbatim}
+
+
+\section*{Running}
+There are are two ways to run the example - either from the repl (not thread safe) or from a server runner (thread safe - should be OK to deploy).
+
+
+\section*{ReplRunner - for development}
+Running from the repl has the benefit of being able to inspect/modify symbols, use the debugger, etc. All the normal benefits. It is not thread safe though so it should only be used for development only. Use the ServerRunner to deploy.
+
+Running
+\begin{verbatim}
+java -cp PicoLispEmbedded.jar;.;simple-4.1.21.jar;hsqldb.jar PicoLisp go.l
+\end{verbatim}
+
+
+\textbf{ReplRunner.java}
+\\
+This is the generic, reusable class for interfacing between ersatz and the simpleframework web server.
+The point of this class is to be invoked from the PicoLisp script to handle
+the server request. Although it apppears multi-threaded, it is not because
+all PicoLisp symbols are static/shared across the process. It uses a less-than-obvious way to dispatch the event notification back to PicoLisp (ActionEvent) to mimic the Swing example. I wasn't able to
+get it to work using a normal Runnable interface.  It also exposes some helpers to get at the Request/Reponse data because ersatz got confused with the multiple interface dispatching.
+\begin{verbatim}
+import org.simpleframework.http.core.Container;
+import org.simpleframework.http.Response;
+import org.simpleframework.http.Request;
+import org.simpleframework.http.Query;
+import org.simpleframework.http.Form;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.PrintStream;
+import java.io.IOException;
+
+public class ReplRunner implements Container {
+
+	ActionListener evt;
+
+
+	public void addActionListener(ActionListener evt) {
+		this.evt = evt;
+	}
+	public class RequestEvent extends ActionEvent {
+		Request request;
+		Response response;
+
+		public RequestEvent(Object request, Response response) {
+			super(response, 1, "foo");
+			this.request = (Request)request;
+			this.response = response;
+		}
+
+		public PrintStream getBody() {
+			try {
+				return response.getPrintStream();
+			} catch (IOException e) {
+				System.out.println(e.toString());
+				return null;
+			}
+		}
+		public String getForm(String key) {
+			try {
+				return request.getForm().get(key).toString();
+			} catch (IOException e) {
+				return null;
+			}
+		}
+
+		public String getFormString() {
+			try {
+				return request.getForm().toString();
+			} catch (IOException e) {
+				return null;
+			}
+		}
+
+		public String getMethod() {
+			return request.getMethod().toString();
+		}
+		public String getQueryString() {
+			return request.getQuery().toString();
+		}
+		public String getPath() {
+			return request.getPath().toString();
+		}
+	}
+	public void handle(Request request, Response response) {
+		response.set("Content-Type", "text/html");
+		evt.actionPerformed(new RequestEvent(request, response));
+	}
+}
+\end{verbatim}
+
+
+\textbf{go.l}
+\\
+This script is the main entry point and calls ReplRunner for each request. It likely can be generic
+\begin{verbatim}
+(de handler (Evt)
+    (setq *Path (java Evt 'getPath))
+    (setq *Body (java Evt 'getBody))
+	(setq *Method (java (java Evt 'getMethod)))
+    (setq *Form (java (java Evt 'getFormString)))
+	(load "page.l") # this is the page that is invoked
+    (java *Body 'close) )
+
+(setq Container (java "ReplRunner" T))
+(java Container "addActionListener"
+  (interface "java.awt.event.ActionListener" 'actionPerformed handler) )
+(setq Con (java "org.simpleframework.transport.connect.SocketConnection" T Container))
+(setq Addr (java "java.net.InetSocketAddress" T 8005))
+(java Con 'connect Addr)
+# validate it works:
+(call "curl" "-s" "http://localhost:8005/hello/world?abc=1234")
+\end{verbatim}
+
+
+\section*{ServerRunner - for deployment}
+
+\textbf{ServerRunner.java}
+
+Running
+\begin{verbatim}
+java -cp PicoLispEmbedded.jar;.;simple-4.1.21.jar;hsqldb.jar ServerRunner 8005
+\end{verbatim}
+
+
+\\
+This is a generic class intended deploying ersatz web apps. This class is similar to the ReplRunner except that it is started directly from Java and invokes PicoLisp on every server request. This uses the embeddable, hacked version of PicoLisp that removes all static variables so it permits it to be muli-threaded.
+\begin{verbatim}
+import org.simpleframework.http.core.Container;
+import org.simpleframework.transport.connect.Connection;
+import org.simpleframework.transport.connect.SocketConnection;
+import org.simpleframework.http.Response;
+import org.simpleframework.http.Request;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.io.PrintStream;
+import java.io.IOException;
+
+public class ServerRunner implements Container {
+
+   public void handle(Request request, Response response) {
+	try {
+      PrintStream body = response.getPrintStream();
+      long time = System.currentTimeMillis();
+
+	  PicoLisp pico = new PicoLisp();
+	  pico._main(null);
+      pico.load(null, '\0', pico.mkStr("lib.l"));
+	  pico.setSymbol(response.getPrintStream(), "*Body");
+	  pico.setSymbol(request.getMethod().toString(), "*Method");
+	  pico.setSymbol(request.getPath().toString(), "*Path");
+	  try {
+		pico.setSymbol(request.getForm().toString(), "*Form");
+		} catch (IOException e) {
+			return;
+		}
+
+	  pico.setSymbol(request.getPath().toString(), "*Path");
+
+	  //pico.eval_str("(java *Body 'println \"hello\")");
+      pico.load(null, '\0', pico.mkStr("page.l"));
+
+      response.set("Content-Type", "text/html");
+      response.set("Server", "HelloWorld/1.0 (Simple 4.0)");
+      response.setDate("Date", time);
+      response.setDate("Last-Modified", time);
+
+      body.close();
+      	} catch (IOException e) { }
+
+   }
+
+   public static void main(String[] list) throws Exception {
+	  if (list.length == 0) {
+		System.out.println("Specify port as first argument");
+		return;
+	  }
+      Container container = new ServerRunner();
+      Connection connection = new SocketConnection(container);
+      SocketAddress address = new InetSocketAddress(Integer.parseInt(list[0]));
+	  System.out.println("Listening on port: " + list[0]);
+
+      connection.connect(address);
+   }
+}
+\end{verbatim}
+
+\end{document}

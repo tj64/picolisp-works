@@ -1,0 +1,211 @@
+\title{First Class Environments}
+\input{mainmatter/authors/alex}
+\maketitle
+
+% 16jul12
+% Alexander Burger
+
+% \documentclass[10pt,a4paper]{article}
+% \usepackage{graphicx}
+
+% \textwidth 1.4\textwidth
+% \textheight 1.125\textheight
+% \oddsidemargin 0em
+% \evensidemargin 0em
+% \headsep 0em
+% \parindent 0em
+% \parskip 6pt
+
+% \title{First Class Environments}
+% \author{Alexander Burger\\abu@software-lab.de}
+% \date{2012-05-24}
+
+% \begin{document}
+% \maketitle
+
+\begin{abstract}
+  This article discusses the advantages and technical details of
+  \emph{first class environments} in PicoLisp. First, the differences
+  between \emph{dynamic binding} and \emph{lexical scoping} are
+  highlighted, then \emph{first class data types} and \emph{first
+    class environments} are discussed. 
+\end{abstract}
+
+
+\section{Dynamic Binding vs Lexical Scoping}
+\label{sec:firstclass-dynamic-binding}
+
+PicoLisp uses dynamic binding for symbolic variables. This means that
+the value of a symbol is determined by the current runtime context,
+not by the lexical context in the source file.
+
+This has advantages in practical programming. It allows you to write
+independent code fragments as \textbf{data} which can be passed to
+other parts of the program to be later executed as \textbf{code} in
+that context.
+
+For example, the major part of the PicoLisp GUI framework consists of
+code snippets, which are installed as event handlers, button actions
+or update managers in GUI components.
+
+In a lexically scoped language, you can't separate code from its
+environment. A call like \texttt{(foo X Y)} has no meaning by itself
+(unless \texttt{X} and \texttt{Y} are treated as ``free'' variables,
+i.e. dynamically, not lexically). Instead, you must write a
+\texttt{let} or \texttt{lambda} expression, or pass around full
+function definitions as closures. All this is much more noisy
+(consider the typical case of dozens of such fragments in a single GUI
+page).
+
+PicoLisp tries to be as dynamic as possible. This involves also (and
+much more important than just variable bindings) things like
+I/O-channels,
+'\underline{make}\footnote{http://software-lab.de/doc/refM.html\#make}'
+environments, the place of the currently executed method in the
+inheritance hierarchy (for
+'\underline{super}\footnote{http://software-lab.de/doc/refS.html\#super}'
+and
+'\underline{extra}\footnote{http://software-lab.de/doc/refE.html\#extra}')
+or the current
+'\underline{This}\footnote{http://software-lab.de/doc/refT.html\#This}'
+object. A running code fragment can always assume to have access to
+these environments.
+
+This article is only concerned about variable bindings.
+
+\section{First Class Data Type}
+\label{sec:firstclass-first-class-data-type}
+
+In programming languages, a first class data type can be created and manipulated
+separately within the language, independent from its intended purpose.
+
+For a \textbf{function}, for example, the intended purpose is to \textit{call} it. If it is
+a first class function, it can be build, passed around etc., independent from
+that. The two tasks (creating and calling the function) can be handled
+independently within the language.
+
+For an \textbf{environment}, the intended purpose is to
+\begin{enumerate}
+   \item activate it
+   \item execute one or more expressions in it
+   \item deactivate it, possibly restoring the previous environment
+\end{enumerate}
+If it is a first class environment it, can also be created and manipulated
+within the language.
+
+\section{First Class Environments}
+\label{sec:firstclass-first-class-environments}
+
+To make such an environment useful, it is important that the three tasks
+(creation, activation/deactivation and execution) can be controlled
+independently.
+
+Let us consider the expression \texttt{(foo X Y)} again. Assume we want to execute it
+in an environment where \texttt{X} is 3 and \texttt{Y} is 4. The direct way is
+\begin{wideverbatim}
+   (let (X 3 Y 4)
+      (foo X Y) )
+\end{wideverbatim}
+
+This handles the three tasks all at once. It creates and activates the
+environment, immediately executes the code, and then deactivates the
+environment.
+
+If the expression \texttt{(foo X Y)} is supplied from the application code,
+stand-alone in one part of the application, and is supposed to run in some other
+part of the application in an environment active there at that moment, it is
+also no problem. It can simply be executed:
+\begin{wideverbatim}
+   (foo X Y)
+\end{wideverbatim}
+
+If, however, that application environment supposed to be manipulated
+separately, for example because it is passed over across a HTTP transaction or
+appears in an RPC call, then the
+\begin{itemize}
+   \item creation of that environment is typically done in the application
+   \item activation of that environment is done in the GUI framework
+   \item execution of the expression(s) is done in the application
+   \item deactivation is done in the GUI framework again
+\end{itemize}
+
+\subsection{Creation}
+\label{sec:firstclass-creation}
+
+The environment is represented by a list of symbol-value pairs. It can be
+created with the direct, explicit lisp operations, or more conveniently with the
+'\underline{env}\footnote{http://software-lab.de/doc/refE.html\#env}' function.
+
+If the environment is intended as a subset of the current environment, i.e. if
+you simply want to create it with the current values of \texttt{X} and \texttt{Y}, you may
+write
+\begin{wideverbatim}
+   : (setq Env (env '(X Y)))
+   -> ((Y . 4) (X . 3))
+\end{wideverbatim}
+
+Otherwise, you may pass explit values
+\begin{wideverbatim}
+   : (setq Env (env 'X 3 'Y 4))
+   -> ((Y . 4) (X . 3))
+\end{wideverbatim}
+
+
+\subsection{Activation}
+\label{sec:firstclass-activation}
+
+The simplest way to activate an environment would be to to iterate over the list
+and '\underline{set}\footnote{http://software-lab.de/doc/refS.html\#set}' each symbol to its value.
+This is normally not recommended, because it would not restore the previous
+environment when done.
+
+In most cases either '\underline{bind}\footnote{http://software-lab.de/doc/refB.html\#bind}' or
+'\underline{job}\footnote{http://software-lab.de/doc/refJ.html\#job}' are used. The main difference
+between these two functions is that job modifies the environment destructively,
+to store modified values before restoring the previous environment.
+\begin{wideverbatim}
+   : (bind Env (* X Y))
+   -> 12
+
+   : (job Env (* X Y))
+   -> 12
+\end{wideverbatim}
+
+If the environment is to be modified by the expression, use 'job':
+\begin{wideverbatim}
+   : Env
+   -> ((Y . 4) (X . 3))
+
+   : (job Env (* X (inc 'Y)))
+   -> 15
+
+   : Env
+   -> ((Y . 5) (X . 3))
+\end{wideverbatim}
+
+These examples don't show the separation of activation and execution, as this
+cannot be simply done in an isolated example. For a real-world use case, take a
+look at the top-level GUI function in ``@lib/form.l``. The relevant part can be
+reduced to
+\begin{wideverbatim}
+   (with "*App"                        # Point 'This' to the current form
+      (job (: env)                     # Activate environment of that form
+         (<post> ...
+            (<hidden> ...)
+            ...
+            (if *PRG
+               (let gui
+                  ...
+                  (htPrin "Prg") )     # Execute the GUI code
+               ...
+               (let gui
+                  ...
+                  (htPrin "Prg") )     # Execute the GUI code
+\end{wideverbatim}
+
+The GUI code which actually builds the page is in \texttt{"Prg"}. When it runs,
+\texttt{This} and the desired environment (from the form's \texttt{env} property) are
+properly activated.
+
+A similar case can be found more down in ``@lib/form.l`` in 'postGui' to handle
+HTTP POST and XMLHttpRequest events.
