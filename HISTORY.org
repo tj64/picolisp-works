@@ -3,6 +3,9 @@
    [2012-08-26 So 01:11]
 
 
+** TODO announce new version in mailing list
+   [2012-08-26 So 01:37]
+
 ** TODO change version number and date in svmult.cls
    [2012-08-26 So 01:11]
 ** TODO replace download on github
@@ -10,18 +13,38 @@
 ** TODO replace pdf on scribd
    [2012-08-26 So 01:11]
 
-* NEXT Version 1.01
+
+* DONE Version 1.01
+  CLOSED: [2012-08-26 So 01:38]
+  :LOGBOOK:
+  - State "DONE"       from "NEXT"       [2012-08-26 So 01:38]
+  :END:
   [2012-08-26 So 00:11]
 
+
+** DONE announce new version in mailing list
+   CLOSED: [2012-08-26 So 01:37]
+   :LOGBOOK:
+   - State "DONE"       from "TODO"       [2012-08-26 So 01:37]
+   :END:
+   [2012-08-26 So 01:37]
 ** DONE change version number and date in svmult.cls
    CLOSED: [2012-08-26 So 01:13]
    :LOGBOOK:
    - State "DONE"       from "TODO"       [2012-08-26 So 01:13]
    :END:
    [2012-08-26 So 00:20]
-** TODO replace download on github
+** DONE replace download on github
+   CLOSED: [2012-08-26 So 01:37]
+   :LOGBOOK:
+   - State "DONE"       from "TODO"       [2012-08-26 So 01:37]
+   :END:
    [2012-08-26 So 00:20]
-** TODO replace pdf on scribd
+** DONE replace pdf on scribd
+   CLOSED: [2012-08-26 So 01:37]
+   :LOGBOOK:
+   - State "DONE"       from "TODO"       [2012-08-26 So 01:37]
+   :END:
    [2012-08-26 So 00:20]
 ** DONE check with Alex if FAQ are up-to-date
    CLOSED: [2012-08-26 So 00:34]
