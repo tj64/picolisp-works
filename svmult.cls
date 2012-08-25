@@ -438,7 +438,7 @@ passing it to article class \MessageBreak
    \vskip 1cm               % Vertical space after subtitle.
   %\fi
 %  \if!\@date!\else
-    Version 1.0 \\ August 23, 2012 %\@date
+    Version 1.01 \\ August 26, 2012 %\@date
     \par
     \vskip 1.5em            % Vertical space after date.
 %  \fi

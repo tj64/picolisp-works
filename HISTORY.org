@@ -1,0 +1,79 @@
+
+* NEXT Version 1.02
+   [2012-08-26 So 01:11]
+
+
+** TODO change version number and date in svmult.cls
+   [2012-08-26 So 01:11]
+** TODO replace download on github
+   [2012-08-26 So 01:11]
+** TODO replace pdf on scribd
+   [2012-08-26 So 01:11]
+
+* NEXT Version 1.01
+  [2012-08-26 So 00:11]
+
+** DONE change version number and date in svmult.cls
+   CLOSED: [2012-08-26 So 01:13]
+   :LOGBOOK:
+   - State "DONE"       from "TODO"       [2012-08-26 So 01:13]
+   :END:
+   [2012-08-26 So 00:20]
+** TODO replace download on github
+   [2012-08-26 So 00:20]
+** TODO replace pdf on scribd
+   [2012-08-26 So 00:20]
+** DONE check with Alex if FAQ are up-to-date
+   CLOSED: [2012-08-26 So 00:34]
+   :LOGBOOK:
+   - State "DONE"       from "TODO"       [2012-08-26 So 00:34]
+   :END:
+   [2012-08-26 So 00:18]
+** DONE add missing summaries (henriks tutorials!)
+   CLOSED: [2012-08-26 So 01:13]
+   :LOGBOOK:
+   - State "DONE"       from "TODO"       [2012-08-26 So 01:13]
+   :END:
+   [2012-08-26 So 00:18]
+** DONE fix Jose Romeros name in authors
+   CLOSED: [2012-08-26 So 00:18]
+   :LOGBOOK:
+   - State "DONE"       from "TODO"       [2012-08-26 So 00:18]
+   :END:
+   [2012-08-26 So 00:16]
+** DONE fix scribd links in prefix
+   CLOSED: [2012-08-26 So 00:16]
+   :LOGBOOK:
+   - State "DONE"       from "TODO"       [2012-08-26 So 00:16]
+   :END:
+   [2012-08-26 So 00:15]
+** DONE fix \n and \r in text that confuse latex
+   CLOSED: [2012-08-26 So 00:15]
+   :LOGBOOK:
+   - State "DONE"       from "TODO"       [2012-08-26 So 00:15]
+   :END:
+   [2012-08-26 So 00:14]
+** DONE fix broken index
+   CLOSED: [2012-08-26 So 00:14]
+   :LOGBOOK:
+   - State "DONE"       from "TODO"       [2012-08-26 So 00:14]
+   :END:
+   [2012-08-26 So 00:13]
+** DONE credit Yiorgos Adamopoulos for the book title
+   CLOSED: [2012-08-26 So 00:13]
+   :LOGBOOK:
+   - State "DONE"       from "TODO"       [2012-08-26 So 00:13]
+   :END:
+** DONE add HISTORY file to repo
+   CLOSED: [2012-08-26 So 00:24]
+   :LOGBOOK:
+   - State "DONE"       from "TODO"       [2012-08-26 So 00:24]
+   :END:
+  [2012-08-26 So 00:24]
+
+* DONE Version 1.0
+  CLOSED: [2012-08-26 So 00:19]
+  :LOGBOOK:
+  - State "DONE"       from ""           [2012-08-26 So 00:19]
+  :END:
+   [2012-08-23 Do 23:45]

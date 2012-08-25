@@ -135,7 +135,7 @@ Among them are:
 \item The \texttt{quote} function returns all unevaluated arguments, instead of
    just the first one. This is both faster (\texttt{quote} does not have to
    take the CAR of its argument list) and smaller (a single cell instead
-   of two). For example, \TEXTTT{'A} expands to \texttt{(quote . A)} and \texttt{'(A B C)}    expands to \texttt{(quote A B C)}.
+   of two). For example, \texttt{'A} expands to \texttt{(quote . A)} and \texttt{'(A B C)}    expands to \texttt{(quote A B C)}.
 \item The symbol \texttt{@} is automatically maintained as a local variable, and
    set implicitly in certain flow- and logic-functions. This makes it
    often unnecessary to allocate and assign local variables.

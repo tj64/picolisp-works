@@ -35,7 +35,7 @@ with \texttt{\$.pico.post} and works just like the original.
 The only change in the plugin compared with the original is line 2806
 in \texttt{jquery.js}, it looks like this in the original:
 \textbf{xhr.send(s.data);}, I've changed that to
-\textbf{xhr.send(s.data + `\r\n');}.
+\textbf{xhr.send(s.data + `\textbackslash{}r\textbackslash{}n');}.
 
 \subsection{Implementation}
 \label{sec:dfs}
