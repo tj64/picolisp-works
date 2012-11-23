@@ -1,8 +1,31 @@
 
+* TODO Version 1.03
+  [2012-08-30 Do 19:18]
+
+** TODO announce new version in mailing list
+   [2012-08-26 So 01:37]
+
+** TODO change version number and date in svmult.cls
+   [2012-08-26 So 01:11]
+** TODO replace download on github
+   [2012-08-26 So 01:11]
+** TODO replace pdf on scribd
+   [2012-08-26 So 01:11]
+
+
+
 * NEXT Version 1.02
    [2012-08-26 So 01:11]
 
 
+** TODO add article 'A deeper look at for' from the Wiki
+   [2012-11-23 Fr 12:10]
+** TODO add article 'Rosetta Code Analysis' from the Wiki
+   [2012-11-23 Fr 12:10]
+** TODO add part before appendix
+   [2012-08-26 So 03:17]
+** TODO fix contributor page (formatting)
+   [2012-08-26 So 02:16]
 ** TODO announce new version in mailing list
    [2012-08-26 So 01:37]
 
@@ -93,6 +116,7 @@
    - State "DONE"       from "TODO"       [2012-08-26 So 00:24]
    :END:
   [2012-08-26 So 00:24]
+
 
 * DONE Version 1.0
   CLOSED: [2012-08-26 So 00:19]
