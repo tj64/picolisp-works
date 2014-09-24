@@ -108,8 +108,8 @@ Try this:
 \end{wideverbatim}
 
 Different than above but the result is the same, it's easy to see that
-\texttt{setq var} is just a shortcut for \texttt{set ‘var}. The
-\texttt{‘} is a shortcut for \textbf{quote}, everything quoted is
+\texttt{setq var} is just a shortcut for \texttt{set 'var}. The
+\texttt{'} is a shortcut for \textbf{quote}, everything quoted is
 taken literally. Variable names inside a quoted list will of course
 not expand into their values - except when when evaluated or passed to
 a family of special functions, \textbf{mapcar} (described below) is
@@ -145,7 +145,7 @@ just like with the \texttt{\&} in PHP. Let's look at such an example:
 (prinl *Greeting)
 \end{wideverbatim}
 
-In this case, as you can see the \texttt{‘} will make the pop function
+In this case, as you can see the \texttt{'} will make the pop function
 treat Greeting as something passed by reference. Quoted lists can of
 course be created dynamically and then be passed around and executed
 to create yet other lists that will be executed in other places in
@@ -168,9 +168,9 @@ Let's look at a simple example:
 \end{wideverbatim}
 
 In this case we will retrieve all keys, basically the same functionality
-as the PHP function array\_keys. If you do ‘cdr you will instead get the
+as the PHP function array\_keys. If you do 'cdr you will instead get the
 values which corresponds to array\_values(). What if you want to get the
-first fruit in each sub-list? Yep you guessed it, just pass ‘cadr
+first fruit in each sub-list? Yep you guessed it, just pass 'cadr
 instead. Pretty dynamic isn't it? If we return to the Turing machine
 analogy, this would constitute using a placeholder on a raw strip that
 will get it's value when it's time to execute the strip/list.
@@ -183,7 +183,7 @@ case we just keep it simple. Element will be each element in the list,
 in our case the two sub-lists. The result will be a new list whose
 elements are the results of each operation our function literal
 performs. That is why we get a list with ``green'' and ``red'' in it if we
-pass ‘car to getSomething.
+pass 'car to getSomething.
 
 Notice also that there is no return keyword, in PicoLisp (and all Lisps
 I think) all expressions return something, hence no need for a return
