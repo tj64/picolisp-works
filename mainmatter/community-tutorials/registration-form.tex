@@ -296,7 +296,7 @@ not memory.
 We build the layout in a table where each call to
 \texttt{\textless{}row\textgreater{}} will create new rows and tds.
 Notice the calls to \texttt{gui}, apparently \texttt{+E/R} needs the
-\texttt{‘(fname home obj)} list and \texttt{+TextField} the 10 number
+\texttt{'(fname home obj)} list and \texttt{+TextField} the 10 number
 (the size of the field).
 
 Our first custom prefix classes comes in the form of \texttt{+MinLen}
@@ -319,11 +319,11 @@ it).
 Note that the code has been indented to save horizontal space, in
 reality it's just a continuation of the above code.
 
-\texttt{+PwdCheck} will work with \texttt{‘(val> (: home pwd2))} as
+\texttt{+PwdCheck} will work with \texttt{'(val> (: home pwd2))} as
 input, yes it's the value of the ``password again'' field.
 
 The city \texttt{+TextField} will get the result of the \texttt{(asSelect>
-‘+City)} call as it's input, note the lack of a quote (\textbf{‘}). So
+'+City)} call as it's input, note the lack of a quote (\textbf{'}). So
 we evaluate and get the list of cities which will turn the field into
 a drop down instead of a normal text field.
 
@@ -351,8 +351,8 @@ top all the time but insert might be a more proper wording since we
 are replacing nothing with something.
 
 The \texttt{+Fmt} is class will take care of getting and setting the
-date, the first function \texttt{‘((Dat)\dots{})} will \texttt{set>}
-and the second one \texttt{‘((Lst)\dots{})} will be our \texttt{val>}
+date, the first function \texttt{'((Dat)\dots{})} will \texttt{set>}
+and the second one \texttt{'((Lst)\dots{})} will be our \texttt{val>}
 function.
 
 The \texttt{+Chart} prefix is responsible for handling our 3 date drop
